@@ -1,9 +1,10 @@
 import { notFound } from "next/navigation";
-import { VerifiedChip } from "@/components/SessionRow";
+import { DocDot, VerifiedChip } from "@/components/SessionRow";
 import { CountUp } from "@/components/CountUp";
 import { Icon } from "@/components/Icon";
 import { SCORING, SESSIONS } from "@/lib/fixtures";
 import { clockTime, dayLabel, duration, durationSpoken, longDate, plural } from "@/lib/format";
+import { docColor } from "@/lib/docColor";
 
 /** Static export: every session page is prerendered from the fixtures. */
 export function generateStaticParams() {
@@ -17,6 +18,21 @@ export default async function SessionDetail({ params }: { params: Promise<{ id: 
 
   const rawPct = (session.rawMinutes / session.scoredMinutes) * 100;
 
+  // Document colour overrides prism on this hero - the one place besides the
+  // session-row dot that a document's hue appears. Multi-document sessions
+  // are coloured by the primary (first) document, matching how its name is
+  // already treated as primary throughout the row/card components.
+  const doc = docColor(session.documents[0].name);
+  const heroStyle = {
+    "--hero-glow-1": `${doc.onInk}8c`, // ~55% alpha
+    "--hero-glow-2": `${doc.onInk}52`, // ~32% alpha
+    "--hero-accent": doc.onInk,
+    "--hero-chip-bg": `${doc.onInk}26`, // ~15% alpha
+    "--hero-chip-fg": doc.onInk,
+    "--doc-a": doc.dot,
+    "--doc-b": doc.onInk,
+  } as React.CSSProperties;
+
   return (
     <main className="screen">
       <h1 className="screen__title">{dayLabel(session.date)}</h1>
@@ -24,8 +40,8 @@ export default async function SessionDetail({ params }: { params: Promise<{ id: 
         {longDate(session.date)} &middot; {clockTime(session.start)} &ndash; {clockTime(session.end)}
       </p>
 
-      {/* Hero: the scored time. Everything else on this screen explains it. */}
-      <section className="hero" aria-labelledby="scored-h">
+      {/* Hero: the scored time, coloured by this session's document. */}
+      <section className="hero" style={heroStyle} aria-labelledby="scored-h">
         <div className="spread" style={{ alignItems: "flex-start" }}>
           <div className="stack" style={{ gap: 4 }}>
             <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
@@ -55,7 +71,7 @@ export default async function SessionDetail({ params }: { params: Promise<{ id: 
           <span className="t-footnote hero-sub">
             <strong className="num" style={{ color: "#fff" }}>{session.rawMinutes}m</strong> observed
           </span>
-          <span className="t-footnote" style={{ color: "var(--o-300)" }}>
+          <span className="t-footnote" style={{ color: "var(--hero-accent)" }}>
             <strong className="num">+{session.leadInMinutes}m</strong> lead-in
           </span>
         </div>
@@ -97,7 +113,7 @@ export default async function SessionDetail({ params }: { params: Promise<{ id: 
             Lead-in credit
             <span className="t-caption dimmer" style={{ display: "block" }}>Opening the model, before the first save</span>
           </span>
-          <span className="kv__v" style={{ color: "var(--accent-text)" }}>+{session.leadInMinutes} min</span>
+          <span className="kv__v">+{session.leadInMinutes} min</span>
         </div>
         <div className="kv">
           <span className="kv__k" style={{ color: "var(--label)", fontWeight: 600 }}>Scored</span>
@@ -120,7 +136,10 @@ export default async function SessionDetail({ params }: { params: Promise<{ id: 
               <Icon name="doc" size={17} />
             </span>
             <span className="rowitem__grow stack" style={{ gap: 2 }}>
-              <span className="rowitem__name">{d.name}</span>
+              <span className="row" style={{ gap: 6 }}>
+                <DocDot name={d.name} />
+                <span className="rowitem__name">{d.name}</span>
+              </span>
               <span className="rowitem__meta">{d.tab}</span>
             </span>
             <span className="rowitem__value" style={{ fontSize: 15 }}>{plural(d.edits, "edit")}</span>
@@ -135,8 +154,8 @@ export default async function SessionDetail({ params }: { params: Promise<{ id: 
             className="avatar"
             style={{
               width: 34, height: 34,
-              background: session.verified ? "var(--accent-soft)" : "var(--surface-3)",
-              color: session.verified ? "var(--accent-text)" : "var(--label-3)",
+              background: session.verified ? "color-mix(in srgb, var(--pos) 14%, transparent)" : "var(--surface-3)",
+              color: session.verified ? "var(--pos)" : "var(--label-3)",
             }}
             aria-hidden="true"
           >

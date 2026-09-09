@@ -7,146 +7,172 @@
                           Translucent, blurred, floating. Never carries a value.
      PAPER  (content)     white/near-black cards. Solid, quiet, recessive.
                           Everything you read a number off lives here.
-     INK    (hero)        one deep, glowing block per screen. Solid, loud.
+     INK    (hero)        one deep, near-black block per screen. Solid.
 
-   Why ink exists: the brand orange #FF6B00 only reaches 2.86:1 on white, so it
-   can never be text there. On ink it reaches 6.5:1. Giving each screen a single
-   ink block is what lets the real brand colour be used at full strength - the
-   hierarchy and the colour system solve each other.
+   COLOUR MODEL - use as little of it as you can get away with.
 
-   Every pairing below is verified by scripts/check-contrast.mjs, which
-   composites translucent surfaces over the mesh behind them before measuring.
+   The base is neutral by a wide margin: white paper, near-black ink, grey
+   chrome. Because most of the app is white and black, a small amount of
+   colour reads as a lot - restraint is what makes it pop, not saturation.
+   Every ink hero stays near-black by default; colour is an override a screen
+   opts into, never the ink surface's own resting state.
+
+     PRISM   the default accent when nothing more specific applies (Apple's
+             iridescent violet-magenta-pink). Lives on: the single most
+             important ink surface on a screen (Profile's heatmap - the only
+             hero with no semantic of its own), glass rims/edges, the glow
+             beneath glass chrome, and the active tab pill. A gradient that
+             behaves like refracted light, never a flat fill - and never on
+             text: #B24FE0 at full strength is 2.7:1 on white, the same
+             failure the old flat orange had. Text stays near-black or white;
+             the prism is decoration and glow only.
+
+     FIRE    the streak's own colour (amber into red-orange). A streak is a
+             flame - the colour IS the meaning, so it overrides prism on the
+             Today hero and the ember, and nowhere else.
+
+     GOLD    the league's own colour (podium gold). Overrides prism on the
+             League hero, the race track, your row in standings, and the
+             rank-1 number - so a screen about competition never reads as
+             the same "prism default" as Profile.
+
+     DOCUMENT a quiet, deterministic per-document hue (src/lib/docColor.ts),
+             blue-cyan only, kept clear of every other hue above. Appears in
+             exactly two places: a small dot on a session row, and the accent
+             on the session-detail hero, where it overrides prism.
+
+     verified green / unverified neutral / league movement up-green
+     down-red - unchanged, already correct.
+
+   Every pairing below is verified by scripts/check-contrast.mjs, including
+   every prism, fire, gold and document stop, composited over what is
+   actually behind it in both themes.
    ========================================================================= */
 
-/* ---------- brand ramp --------------------------------------------------- */
+/* ---------- semantic ramps ------------------------------------------------ */
 :root {
-  --o-100: #ffe9d6;
-  --o-200: #ffd2a3;
-  --o-300: #ffb87f;
-  --o-400: #ff8c3d;
-  --o-500: #ff6b00; /* brand. Text only on ink; graphic fills only on dark. */
-  --o-600: #e35a00; /* graphic marks on light (3.67:1 on white) */
-  --o-700: #cc4e00;
-  --o-800: #b84600; /* text on light (5.37:1 white, 4.85:1 ground) */
-  --o-900: #8f3600;
+  /* PRISM - violet through magenta into pink. Multi-stop; never a single hex. */
+  --prism-1: #6e5af0;
+  --prism-2: #b24fe0;
+  --prism-3: #ff5fa8;
 
-  --ink: #17120d;
-  --ink-raised: #241b13;
+  /* FIRE - amber into red-orange. */
+  --fire-1: #ffb238;
+  --fire-2: #f55200; /* white icon at 3.45:1, up from 2.61:1 */
+  --fire-3: #ff3d1f;
+  /* Text-weight accent on ink; 11.62:1 (light-mode ink) / 10.41:1 (dark). */
+  --fire-text: #ffc266;
 
-  /* Activity ramp. Always rendered on ink, so one ramp serves both themes. */
-  --heat-0: #2a231b;
-  --heat-1: #6b3a10;
-  --heat-2: #a8570c;
-  --heat-3: #e0700a;
-  --heat-4: #ff8f2e;
+  /* GOLD - podium gold. Different text shade per surface because "paper" is
+     white in light mode and near-black in dark mode - one hex cannot clear
+     AA against both. */
+  --gold-1: #f6d374;
+  --gold-2: #d9a53d;
+  --gold-3: #b9832a;
+  --gold-text-on-ink: var(--gold-1);         /* 12.79:1 / 11.46:1 */
+  --gold-graphic: linear-gradient(160deg, var(--gold-3), #8a6116);
+
+  --ink: #131316;
+  --ink-raised: #1e1e22;
+
+  /* Activity heatmap ramp - the prism, rendered as an intensity scale. Always
+     on ink, so one ramp serves both themes. Level 0 is deliberately close to
+     ink (a resting, uncoloured surface); the ramp only warms toward magenta
+     as activity rises, never starting there. */
+  --heat-0: #2b2632; /* clears both ink variants: 1.26:1 / 1.13:1 */
+  --heat-1: #4a3470;
+  --heat-2: #7a3fa8;
+  --heat-3: #b24fe0;
+  --heat-4: #ff5fa8;
 }
 
-/* ---------- tokens: light ------------------------------------------------ */
+/* ---------- tokens: light ------------------------------------------------- */
 :root {
   color-scheme: light;
 
-  --ground: #f6f3ef;
+  /* Cool near-white, not warm cream - warmth read as sepia and dated. */
+  --ground: #f2f2f5;
   --surface: #ffffff;
-  --surface-2: #f4f0eb;
-  --surface-3: #e9e3db;
-  --separator: rgba(60, 48, 36, 0.13);
-  --separator-strong: #ddd5ca;
+  --surface-2: #f1f1f4;
+  --surface-3: #e6e6ea;
+  --separator: rgba(20, 20, 30, 0.12);
+  --separator-strong: #dcdce1;
 
-  --label: #1c1712;
-  --label-2: #574f47;
-  --label-3: #5f574e;
-
-  --accent: var(--o-500);
-  --accent-graphic: var(--o-600);
-  --accent-text: #a03e00;
-  --accent-pressed: var(--o-900);
-  --accent-soft: rgba(255, 107, 0, 0.13);
-  --accent-softer: rgba(255, 107, 0, 0.065);
-
-  /* Chart bars sit on a white card, so even the LIGHTEST stop of the gradient
-     has to clear the 3:1 graphic bar - the brand orange itself does not
-     (2.86:1), which is why this starts a step down the ramp. */
-  --bar-top: #f26100;
-  --bar-bottom: var(--o-700);
-  /* Discs and avatars carry white glyphs, so the same floor applies. */
-  --disc: linear-gradient(160deg, var(--o-600), var(--o-800));
+  --label: #17171a;
+  --label-2: #57575d;
+  --label-3: #5c5c62;
 
   --pos: #15703f;
   --neg: #a8322a;
 
-  /* mesh: what the glass refracts. Without this, glass over flat white is
-     indistinguishable from a grey rectangle. */
-  --mesh-a: rgba(255, 107, 0, 0.26);
-  --mesh-b: rgba(255, 150, 70, 0.19);
-  --mesh-c: rgba(255, 107, 0, 0.16);
-  --edge-fade: #f7f2ec;
-  --glow-warm: rgba(255, 107, 0, 0.42);
+  --gold-text-on-light: #8a6116; /* 5.52:1 on white */
 
-  --glass-tint: rgba(255, 252, 248, 0.72);
+  /* the mesh + glow: what the glass refracts. Kept minimal and prism-only, so
+     colour appears where the glass actually needs something to bend - not as
+     a wash over the whole page. */
+  --glow-prism: rgba(178, 79, 224, 0.30);
+  --edge-fade: #f3f3f6;
+
+  --glass-tint: rgba(255, 255, 255, 0.74);
   --glass-filter: blur(32px) saturate(190%);
-  --glass-rim: rgba(255, 255, 255, 0.95);
-  --glass-edge: rgba(70, 45, 20, 0.07);
+  --glass-rim: rgba(240, 225, 250, 0.92); /* faint prism cast, not plain white */
+  --glass-edge: rgba(30, 20, 40, 0.06);
   --glass-lit: rgba(255, 255, 255, 0.45);
-  --glass-shadow: 0 12px 38px rgba(60, 35, 10, 0.13), 0 2px 8px rgba(60, 35, 10, 0.06);
-  --chrome-solid: #fdfaf6;
+  --glass-shadow: 0 12px 38px rgba(20, 16, 28, 0.11), 0 2px 8px rgba(20, 16, 28, 0.05);
+  --chrome-solid: #fafafc;
 
-  --card-shadow: 0 1px 2px rgba(60, 40, 20, 0.05), 0 6px 20px rgba(60, 40, 20, 0.05);
-  --hero-shadow: 0 18px 46px rgba(120, 55, 0, 0.28), 0 3px 10px rgba(60, 30, 0, 0.16);
+  --card-shadow: 0 1px 2px rgba(20, 20, 28, 0.05), 0 6px 20px rgba(20, 20, 28, 0.05);
+  --hero-shadow: 0 18px 46px rgba(0, 0, 0, 0.24), 0 3px 10px rgba(0, 0, 0, 0.14);
+
+  /* Chart bars sit on a white paper card - per the colour model, that surface
+     never carries prism/fire/gold/document colour, so the bars are neutral
+     charcoal, not an accent. */
+  --bar-top: #4b4b52;
+  --bar-bottom: #2b2b30;
+  /* Badge/avatar discs on paper - same rule, neutral. */
+  --disc-neutral: #2b2b30;
 }
 
-/* ---------- tokens: dark ------------------------------------------------- */
+/* ---------- tokens: dark --------------------------------------------------- */
 @media (prefers-color-scheme: dark) {
   :root {
     color-scheme: dark;
 
-    --ground: #0c0a08;
-    --surface: #1a1612;
-    --surface-2: #241f19;
-    --surface-3: #322a22;
-    --separator: rgba(255, 232, 210, 0.12);
-    --separator-strong: #3a3128;
+    --ground: #0a0a0c;
+    --surface: #19191c;
+    --surface-2: #232326;
+    --surface-3: #313134;
+    --separator: rgba(230, 226, 240, 0.11);
+    --separator-strong: #37373b;
 
-    --label: #fdfbf9;
-    --label-2: #b9ada0;
-    --label-3: #a99d90;
-
-    --accent: #ff7a1f;
-    --accent-graphic: #ff7a1f;
-    --accent-text: #ff9e57;
-    --accent-pressed: #e35a00;
-    --accent-soft: rgba(255, 122, 31, 0.20);
-    --accent-softer: rgba(255, 122, 31, 0.10);
-
-    /* On a dark card there is headroom, so the bars can run at full brand. */
-    --bar-top: var(--o-400);
-    --bar-bottom: var(--o-500);
-    /* The disc does NOT lighten in dark mode: its white glyph is measured
-       against the disc itself, not the card behind it, so the floor is the
-       same in both themes. */
-    --disc: linear-gradient(160deg, var(--o-600), var(--o-800));
+    --label: #fcfcfd;
+    --label-2: #b6b6bb;
+    --label-3: #a3a3a9;
 
     --pos: #4fd786;
     --neg: #ff8f85;
 
-    --mesh-a: rgba(255, 107, 0, 0.30);
-    --mesh-b: rgba(255, 140, 61, 0.16);
-    --mesh-c: rgba(255, 107, 0, 0.14);
-    --edge-fade: #100c09;
-    --glow-warm: rgba(255, 107, 0, 0.38);
+    --gold-text-on-light: #f0c25c; /* 10.51:1 on the dark surface */
+
+    --glow-prism: rgba(178, 79, 224, 0.34);
+    --edge-fade: #0d0d0f;
 
     /* glass on dark takes a dark tint, never a light one */
-    --glass-tint: rgba(30, 24, 18, 0.62);
+    --glass-tint: rgba(22, 22, 26, 0.62);
     --glass-filter: blur(32px) saturate(175%);
-    --glass-rim: rgba(255, 226, 198, 0.17);
-    --glass-edge: rgba(255, 226, 198, 0.07);
-    --glass-lit: rgba(255, 190, 130, 0.06);
+    --glass-rim: rgba(220, 195, 240, 0.20); /* faint prism cast */
+    --glass-edge: rgba(220, 195, 240, 0.07);
+    --glass-lit: rgba(210, 190, 230, 0.05);
     --glass-shadow: 0 12px 38px rgba(0, 0, 0, 0.6), 0 2px 10px rgba(0, 0, 0, 0.45);
-    --chrome-solid: #1b1611;
+    --chrome-solid: #1a1a1d;
 
     --card-shadow: 0 1px 2px rgba(0, 0, 0, 0.45), 0 6px 20px rgba(0, 0, 0, 0.3);
-    --hero-shadow: 0 18px 46px rgba(0, 0, 0, 0.6), 0 0 0 0.5px rgba(255, 140, 61, 0.18);
+    --hero-shadow: 0 18px 46px rgba(0, 0, 0, 0.6), 0 0 0 0.5px rgba(255, 255, 255, 0.06);
+
+    --bar-top: #d6d6da;
+    --bar-bottom: #9c9ca3;
+    --disc-neutral: #38383e;
   }
-  /* the hero lifts off a near-black ground instead of sinking into it */
   :root { --ink-surface: var(--ink-raised); }
 }
 :root { --ink-surface: var(--ink); }
@@ -201,27 +227,23 @@ body {
   overscroll-behavior-y: none;
 }
 
-/* The mesh. Three soft accent washes over the ground - one deliberately
-   parked at the bottom of the viewport so the floating tab bar always has
-   colour beneath it to bend and tint. Fixed, so it never scrolls out from
-   under the chrome. */
+/* No page-wide colour wash. Per the colour model, restraint means the
+   nav bar over plain scrolled content stays clear glass with nothing to
+   bend - colour only appears where the tab bar sits, via .glow-bottom
+   below, which is what the glass there actually needs to tint from. */
 body::before {
   content: "";
   position: fixed;
   inset: 0;
   z-index: -1;
   pointer-events: none;
-  background:
-    radial-gradient(72% 38% at 2% 4%, var(--mesh-a) 0%, transparent 66%),
-    radial-gradient(64% 32% at 102% 20%, var(--mesh-b) 0%, transparent 64%),
-    radial-gradient(96% 28% at 50% 100%, var(--mesh-c) 0%, transparent 72%);
 }
 
-a { color: var(--accent-text); text-decoration: none; }
+a { color: var(--label); text-decoration: none; }
 
 button { font: inherit; color: inherit; border: 0; background: none; cursor: pointer; -webkit-tap-highlight-color: transparent; }
 
-:focus-visible { outline: 2.5px solid var(--accent-graphic); outline-offset: 2px; border-radius: 6px; }
+:focus-visible { outline: 2.5px solid var(--label); outline-offset: 2px; border-radius: 6px; }
 
 .sr-only {
   position: absolute; width: 1px; height: 1px;
@@ -261,7 +283,7 @@ button { font: inherit; color: inherit; border: 0; background: none; cursor: poi
 .section-link {
   display: inline-flex; align-items: center; min-height: 44px;
   padding: 0 4px; margin: -13px -4px;
-  color: var(--accent-text); font-size: 13px; line-height: 18px;
+  color: var(--label); font-size: 13px; line-height: 18px;
   font-weight: 600; white-space: nowrap;
 }
 
@@ -332,7 +354,14 @@ button { font: inherit; color: inherit; border: 0; background: none; cursor: poi
   height: calc(var(--safe-b) + 150px);
   z-index: 31;
   pointer-events: none;
-  background: radial-gradient(92% 80% at 50% 104%, var(--glow-warm) 0%, transparent 74%);
+  /* Two off-centre stops (violet, pink) plus a centred magenta core - light
+     dispersing through glass, not a flat tint. This is the ONE place prism
+     washes the page; everywhere else it is scoped to a single hero, a rim,
+     or the tab pill. */
+  background:
+    radial-gradient(60% 70% at 30% 118%, rgba(110, 90, 240, 0.22) 0%, transparent 72%),
+    radial-gradient(60% 70% at 72% 118%, rgba(255, 95, 168, 0.20) 0%, transparent 72%),
+    radial-gradient(92% 80% at 50% 104%, var(--glow-prism) 0%, transparent 74%);
 }
 
 .edge-bottom {
@@ -376,7 +405,7 @@ button { font: inherit; color: inherit; border: 0; background: none; cursor: poi
   padding: 5px 10px; border-radius: var(--r-chip);
   font-size: 12px; line-height: 16px; font-weight: 600; white-space: nowrap;
 }
-.chip-accent { background: var(--accent-soft); color: var(--accent-text); }
+.chip-accent { background: rgba(178, 79, 224, 0.12); color: var(--label); }
 .chip-pos { background: color-mix(in srgb, var(--pos) 14%, transparent); color: var(--pos); }
 .chip-neutral { background: var(--surface-2); color: var(--label-2); }
 
@@ -393,48 +422,58 @@ button { font: inherit; color: inherit; border: 0; background: none; cursor: poi
   padding: 22px;
   color: #fff;
 }
-/* the ember: a warm glow anchored to the hero's own corner */
+/* The hero's own glow. Defaults to PRISM - this is the "single most
+   important ink surface" default the colour model describes. Fire (Today),
+   gold (League) and the per-document hue (Session Detail) override it by
+   setting --hero-glow-1/2 inline; Profile sets nothing and gets prism, which
+   is deliberate - it has no semantic of its own. */
 .hero::before {
   content: ""; position: absolute; inset: -40% -10% auto -10%; height: 190%;
   z-index: -1; pointer-events: none;
   background:
-    radial-gradient(52% 46% at 16% 22%, rgba(255, 107, 0, 0.62) 0%, transparent 70%),
-    radial-gradient(60% 50% at 96% 96%, rgba(255, 60, 0, 0.34) 0%, transparent 72%);
+    radial-gradient(52% 46% at 16% 22%, var(--hero-glow-1, rgba(110, 90, 240, 0.55)) 0%, transparent 70%),
+    radial-gradient(60% 50% at 96% 96%, var(--hero-glow-2, rgba(255, 95, 168, 0.32)) 0%, transparent 72%);
 }
-/* a lit rim, so the block reads as an object rather than a dark rectangle */
+/* A neutral lit rim - so the block reads as an object rather than a dark
+   rectangle - stays the same regardless of which glow is active underneath. */
 .hero::after {
   content: ""; position: absolute; inset: 0; border-radius: inherit;
   pointer-events: none;
-  box-shadow: inset 0 1px 0 0 rgba(255, 190, 130, 0.28),
-    inset 0 0 0 0.5px rgba(255, 150, 70, 0.16);
+  box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.16),
+    inset 0 0 0 0.5px rgba(255, 255, 255, 0.08);
 }
-.hero-label { font-size: 13px; line-height: 18px; font-weight: 600; color: rgba(255, 236, 220, 0.72); }
-.hero-sub { color: rgba(255, 236, 220, 0.78); }
+.hero-label { font-size: 13px; line-height: 18px; font-weight: 600; color: rgba(255, 255, 255, 0.72); }
+.hero-sub { color: rgba(255, 255, 255, 0.78); }
 .hero-value {
   font-family: var(--font-rounded); font-variant-numeric: tabular-nums;
   font-weight: 800; letter-spacing: -2px; line-height: 0.92; color: #fff;
 }
-.hero-unit { font-family: var(--font-rounded); font-weight: 700; color: var(--o-400); }
-.hero-rule { height: 0.5px; background: rgba(255, 200, 160, 0.2); margin: 18px -22px 14px; }
+/* Neutral by default - prism never touches text. Only the semantic overrides
+   (fire, gold, document) set --hero-accent; Profile's prism-default hero
+   leaves this at its neutral fallback. */
+.hero-unit { font-family: var(--font-rounded); font-weight: 700; color: var(--hero-accent, rgba(255, 255, 255, 0.85)); }
+.hero-rule { height: 0.5px; background: rgba(255, 255, 255, 0.16); margin: 18px -22px 14px; }
 .hero-chip {
   display: inline-flex; align-items: center; gap: 5px;
   padding: 5px 10px; border-radius: var(--r-chip);
-  background: rgba(255, 140, 61, 0.18); color: var(--o-300);
+  background: var(--hero-chip-bg, rgba(255, 255, 255, 0.12));
+  color: var(--hero-chip-fg, rgba(255, 255, 255, 0.85));
   font-size: 12px; line-height: 16px; font-weight: 700; white-space: nowrap;
 }
 
-/* the streak flame, sized as a genuine focal point */
+/* The streak flame - fire is the streak's OWN colour, never prism, so this
+   is hardcoded rather than routed through the --hero-glow custom properties. */
 .ember {
   position: relative; width: 84px; height: 84px; flex: none;
   border-radius: var(--r-pill); display: grid; place-items: center;
-  background: linear-gradient(158deg, var(--o-400) 0%, var(--o-500) 42%, var(--o-800) 100%);
+  background: linear-gradient(158deg, var(--fire-1) 0%, var(--fire-2) 46%, var(--fire-3) 100%);
   color: #fff;
-  box-shadow: 0 8px 26px rgba(255, 107, 0, 0.42), inset 0 1px 0 0 rgba(255, 220, 190, 0.5);
+  box-shadow: 0 8px 26px rgba(255, 122, 30, 0.4), inset 0 1px 0 0 rgba(255, 226, 190, 0.5);
 }
 .ember-halo {
   position: absolute; inset: -18px; border-radius: var(--r-pill);
   z-index: -1; pointer-events: none;
-  background: radial-gradient(closest-side, rgba(255, 107, 0, 0.55), transparent 74%);
+  background: radial-gradient(closest-side, rgba(255, 122, 30, 0.5), transparent 74%);
 }
 
 /* =========================================================================
@@ -448,13 +487,16 @@ button { font: inherit; color: inherit; border: 0; background: none; cursor: poi
 }
 .weekchart__bar {
   width: 100%; border-radius: 9px 9px 6px 6px; transform-origin: bottom; min-height: 4px;
+  /* Neutral charcoal, not an accent - bars sit on a white paper card, and per
+     the colour model paper never carries prism/fire/gold/document colour. */
   background: linear-gradient(180deg, var(--bar-top) 0%, var(--bar-bottom) 100%);
-  box-shadow: inset 0 1px 0 0 rgba(255, 210, 163, 0.45);
+  box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.22);
 }
 .weekchart__bar--empty { background: var(--surface-3); box-shadow: none; }
 .weekchart__day { font-size: 11px; line-height: 14px; font-weight: 600; color: var(--label-3); }
-.weekchart__col--today .weekchart__day { color: var(--accent-text); font-weight: 700; }
-.weekchart__col--today .weekchart__track { box-shadow: 0 0 0 1.5px var(--accent-soft); }
+/* Today is marked by weight and a neutral ring, not colour. */
+.weekchart__col--today .weekchart__day { color: var(--label); font-weight: 700; }
+.weekchart__col--today .weekchart__track { box-shadow: 0 0 0 1.5px color-mix(in srgb, var(--label) 16%, transparent); }
 .weekchart__col--future { opacity: 0.42; }
 .weekchart__val {
   font-family: var(--font-rounded); font-variant-numeric: tabular-nums;
@@ -466,7 +508,7 @@ button { font: inherit; color: inherit; border: 0; background: none; cursor: poi
 .heat-months {
   display: grid; gap: 3px; margin-bottom: 6px;
   font-size: 10px; line-height: 12px; font-weight: 700;
-  letter-spacing: 0.3px; color: rgba(255, 236, 220, 0.55);
+  letter-spacing: 0.3px; color: rgba(255, 255, 255, 0.5);
 }
 .heat-months span { grid-row: 1; white-space: nowrap; }
 .heat { display: grid; grid-auto-flow: column; grid-template-rows: repeat(7, 1fr); gap: 3px; }
@@ -476,7 +518,7 @@ button { font: inherit; color: inherit; border: 0; background: none; cursor: poi
   animation-delay: var(--d, 0ms);
 }
 /* "no activity" also carries a ring, so the scale never rests on colour alone */
-.heat__cell[data-level="0"] { box-shadow: inset 0 0 0 1px rgba(255, 200, 160, 0.14); }
+.heat__cell[data-level="0"] { box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12); }
 .heat__cell[data-level="1"] { background: var(--heat-1); }
 .heat__cell[data-level="2"] { background: var(--heat-2); }
 .heat__cell[data-level="3"] { background: var(--heat-3); }
@@ -527,18 +569,19 @@ button { font: inherit; color: inherit; border: 0; background: none; cursor: poi
 .hero .move--down { color: #ff9d94; }
 .hero .move--same { color: rgba(255, 236, 220, 0.62); }
 
-/* race track on the league hero */
+/* Race track on the league hero. Gold, not prism - League overrides the
+   default the same way Today's ember does. */
 .track {
   position: relative; height: 8px; border-radius: 4px;
-  background: rgba(255, 200, 160, 0.16); overflow: hidden;
+  background: rgba(217, 165, 61, 0.16); overflow: hidden;
 }
 .track__fill {
   position: absolute; inset: 0 auto 0 0; border-radius: 4px;
-  background: linear-gradient(90deg, var(--o-600), var(--o-400));
+  background: linear-gradient(90deg, var(--gold-3), var(--gold-1));
 }
 .track__pip {
   position: absolute; top: -3px; width: 2px; height: 14px; border-radius: 1px;
-  background: rgba(255, 236, 220, 0.55);
+  background: rgba(255, 255, 255, 0.55);
 }
 
 /* =========================================================================
@@ -552,8 +595,12 @@ button { font: inherit; color: inherit; border: 0; background: none; cursor: poi
 }
 .badge-tile__disc {
   width: 46px; height: 46px; border-radius: var(--r-pill); display: grid; place-items: center;
-  background: var(--disc);
-  color: #fff; box-shadow: 0 4px 12px rgba(255, 107, 0, 0.28);
+  /* Neutral - badges sit on white paper, and giving up to a dozen of them
+     their own colour would multiply "coloured moments" far past what the
+     colour model allows. The flame/flame2 glyphs still tint fire on top of
+     this disc (ProfileScreen), so "the flame mark uses fire" still holds. */
+  background: var(--disc-neutral);
+  color: #fff; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.24);
 }
 .badge-tile--locked .badge-tile__disc { background: var(--surface-3); color: var(--label-3); box-shadow: none; }
 .badge-tile--locked .badge-tile__name { color: var(--label-2); }
@@ -565,19 +612,19 @@ button { font: inherit; color: inherit; border: 0; background: none; cursor: poi
    ========================================================================= */
 .divider { height: 0.5px; background: var(--separator); margin: 14px -18px; }
 .vdivider { width: 0.5px; align-self: stretch; background: var(--separator); }
-.hero .vdivider { background: rgba(255, 200, 160, 0.2); }
+.hero .vdivider { background: rgba(255, 255, 255, 0.18); }
 
 .kv { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 9px 0; }
 .kv + .kv { border-top: 0.5px solid var(--separator); }
 .kv__k { font-size: 15px; color: var(--label-2); }
 .kv__v { font-family: var(--font-rounded); font-variant-numeric: tabular-nums; font-size: 16px; font-weight: 600; color: var(--label); }
-.hero .kv + .kv { border-top-color: rgba(255, 200, 160, 0.18); }
-.hero .kv__k { color: rgba(255, 236, 220, 0.76); }
+.hero .kv + .kv { border-top-color: rgba(255, 255, 255, 0.16); }
+.hero .kv__k { color: rgba(255, 255, 255, 0.76); }
 .hero .kv__v { color: #fff; }
 
-.deltabar { height: 9px; border-radius: 5px; background: rgba(255, 200, 160, 0.18); overflow: hidden; display: flex; }
-.deltabar__raw { background: linear-gradient(90deg, var(--o-600), var(--o-400)); }
-.deltabar__lead { background: rgba(255, 168, 102, 0.42); }
+.deltabar { height: 9px; border-radius: 5px; background: rgba(255, 255, 255, 0.16); overflow: hidden; display: flex; }
+.deltabar__raw { background: linear-gradient(90deg, var(--doc-a, var(--prism-2)), var(--doc-b, var(--prism-1))); }
+.deltabar__lead { background: rgba(255, 255, 255, 0.22); }
 
 /* =========================================================================
    APP CHROME
@@ -596,7 +643,7 @@ button { font: inherit; color: inherit; border: 0; background: none; cursor: poi
 .navbar[data-stuck="true"] {
   background: var(--glass-tint);
   -webkit-backdrop-filter: var(--glass-filter); backdrop-filter: var(--glass-filter);
-  box-shadow: 0 1px 0 0 var(--glass-edge), 0 8px 26px rgba(60, 35, 10, 0.07);
+  box-shadow: 0 1px 0 0 var(--glass-edge), 0 8px 26px rgba(10, 10, 16, 0.08);
 }
 .navbar[data-stuck="true"]::after { opacity: 1; box-shadow: inset 0 1px 0 0 var(--glass-rim); }
 
@@ -612,7 +659,7 @@ button { font: inherit; color: inherit; border: 0; background: none; cursor: poi
 .navbar__back {
   display: inline-flex; align-items: center; gap: 1px;
   min-width: 44px; min-height: 44px; margin-left: -8px; padding-right: 6px;
-  color: var(--accent-text); font-size: 17px; letter-spacing: -0.41px;
+  color: var(--label); font-size: 17px; letter-spacing: -0.41px;
 }
 .navbar__spacer { min-width: 44px; }
 
@@ -648,10 +695,20 @@ button { font: inherit; color: inherit; border: 0; background: none; cursor: poi
   transition: color 0.2s ease;
 }
 .tab__label { font-size: 10.5px; line-height: 12px; font-weight: 600; }
-.tab[aria-current="page"] { color: var(--accent-text); }
+.tab[aria-current="page"] { color: var(--label); }
 .tab__pill {
   position: absolute; inset: 6px 8px; border-radius: var(--r-pill);
-  background: var(--accent-soft); z-index: 0;
+  /* The active tab pill: one of the few places prism is explicitly
+     sanctioned. The icon/label riding on top stay neutral (var(--label),
+     above) - prism never touches text - so only this translucent capsule
+     carries the colour. Verified safe well past AA even at full strength:
+     every stop here clears >11:1 for the label sitting on it, in both
+     themes (see scripts/check-contrast.mjs). */
+  background: linear-gradient(120deg,
+    rgba(110, 90, 240, 0.30) 0%,
+    rgba(178, 79, 224, 0.30) 50%,
+    rgba(255, 95, 168, 0.30) 100%);
+  z-index: 0;
 }
 .tab__icon, .tab__label { position: relative; z-index: 1; }
 
@@ -713,17 +770,18 @@ button { font: inherit; color: inherit; border: 0; background: none; cursor: poi
   .heat__cell { animation: none !important; }
 }
 
-/* 4. Increased contrast. */
+/* 4. Increased contrast. Links and focus are already var(--label) - the
+      maximum contrast available - so there is nothing to tighten there.
+      What this can still do: darken the secondary/tertiary labels further,
+      nearly solidify the glass, and push the two semantics that render text
+      on paper (gold's league row, document colour's dot) darker/richer. */
 @media (prefers-contrast: more) {
   :root {
     --label-2: #3a332c;
     --label-3: #453d35;
     --separator: rgba(60, 48, 36, 0.4);
     --glass-tint: rgba(255, 253, 250, 0.94);
-    --accent-text: var(--o-900);
-    --mesh-a: rgba(255, 107, 0, 0.10);
-    --mesh-b: rgba(255, 140, 61, 0.07);
-    --mesh-c: rgba(255, 107, 0, 0.12);
+    --gold-text-on-light: #6b4c0d; /* 7.88:1 on white, up from 5.52:1 */
   }
   @media (prefers-color-scheme: dark) {
     :root {
@@ -731,7 +789,7 @@ button { font: inherit; color: inherit; border: 0; background: none; cursor: poi
       --label-3: #d3c8bd;
       --separator: rgba(220, 200, 180, 0.5);
       --glass-tint: rgba(22, 18, 14, 0.95);
-      --accent-text: #ffc899;
+      --gold-text-on-light: #f6d374; /* 12.79:1 on the dark surface */
     }
   }
 }

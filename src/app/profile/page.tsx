@@ -13,12 +13,15 @@ export default function ProfileScreen() {
 
       {/* Identity - intentionally minimal so it doesn't compete with the hero */}
       <div className="row" style={{ gap: 14, margin: "8px 4px 20px" }}>
+        {/* Neutral, deliberately - the heatmap hero below is this screen's
+            one coloured moment; a colourful identity avatar here would add a
+            second before the reader even reaches it. */}
         <span
           className="avatar"
           style={{
             width: 54, height: 54, fontSize: 19,
-            background: "var(--disc)",
-            color: "#fff", boxShadow: "0 6px 18px rgba(255,107,0,0.32)",
+            background: "var(--disc-neutral)",
+            color: "#fff", boxShadow: "0 6px 18px rgba(0,0,0,0.24)",
           }}
           aria-hidden="true"
         >
@@ -30,8 +33,11 @@ export default function ProfileScreen() {
         </div>
       </div>
 
-      {/* Hero: the all-time heatmap. On ink, so the ramp can run to full
-          brand orange and 182 days of work reads as one object. */}
+      {/* Hero: the all-time heatmap. Profile has no colour of its own, so
+          this is the ONE place prism appears as the default it is meant to
+          be - on ink, so the ramp can run to full strength and 182 days of
+          work reads as one object. No override style here: --hero-glow-1/2
+          and --hero-accent fall back to prism in globals.css. */}
       <section className="hero" style={{ padding: "20px 18px 18px" }} aria-labelledby="activity-h">
         <div className="spread" style={{ marginBottom: 16 }}>
           <div className="stack" style={{ gap: 3 }}>
@@ -43,8 +49,13 @@ export default function ProfileScreen() {
               <span className="hero-unit" style={{ fontSize: 16 }}>hours modeled</span>
             </div>
           </div>
+          {/* Chip stays neutral - this is Profile's prism moment, not a
+              second streak moment. Only the flame glyph itself carries a
+              hint of fire, same idea as the badge discs below. */}
           <span className="hero-chip">
-            <Icon name="flame" size={12} filled />
+            <span style={{ color: "var(--fire-text)" }}>
+              <Icon name="flame" size={12} filled />
+            </span>
             {PROFILE.currentStreak}-day streak
           </span>
         </div>
@@ -98,16 +109,23 @@ export default function ProfileScreen() {
         <span className="t-footnote dim">{earned} of {BADGES.length} earned</span>
       </div>
       <ul className="badge-grid" style={{ margin: 0, padding: 0, listStyle: "none" }}>
-        {BADGES.map((b) => (
-          <li key={b.id} className={`badge-tile${b.earned ? "" : " badge-tile--locked"}`}>
-            <span className="badge-tile__disc" aria-hidden="true">
-              <Icon name={b.earned ? (b.glyph as IconName) : "lock"} size={22} filled weight={b.earned ? 1.9 : 1.75} />
-            </span>
-            <span className="badge-tile__name">{b.name}</span>
-            <span className="badge-tile__sub">{b.earned ? "Earned" : b.detail}</span>
-            <span className="sr-only">{b.earned ? `Earned: ${b.detail}` : `Locked: ${b.detail}`}</span>
-          </li>
-        ))}
+        {BADGES.map((b) => {
+          // Badge discs are neutral (see .badge-tile__disc) - a dozen
+          // colourful discs would be the opposite of restraint. The one
+          // exception: "the flame mark uses fire" per the colour model, so a
+          // flame/flame2 glyph tints its own icon even on the neutral disc.
+          const isFlame = b.earned && (b.glyph === "flame" || b.glyph === "flame2");
+          return (
+            <li key={b.id} className={`badge-tile${b.earned ? "" : " badge-tile--locked"}`}>
+              <span className="badge-tile__disc" style={isFlame ? { color: "var(--fire-text)" } : undefined} aria-hidden="true">
+                <Icon name={b.earned ? (b.glyph as IconName) : "lock"} size={22} filled weight={b.earned ? 1.9 : 1.75} />
+              </span>
+              <span className="badge-tile__name">{b.name}</span>
+              <span className="badge-tile__sub">{b.earned ? "Earned" : b.detail}</span>
+              <span className="sr-only">{b.earned ? `Earned: ${b.detail}` : `Locked: ${b.detail}`}</span>
+            </li>
+          );
+        })}
       </ul>
 
       <p className="t-caption dimmer" style={{ margin: "20px 4px 0", textAlign: "center" }}>

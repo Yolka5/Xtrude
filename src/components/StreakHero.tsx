@@ -17,8 +17,20 @@ export function StreakHero() {
   const reduced = useReducedMotion();
   const toBeat = STREAK.longest - STREAK.current + 1;
 
+  // Fire overrides prism on this hero - a streak is a flame, the colour IS
+  // the meaning. The ember disc/halo are hardcoded fire in globals.css since
+  // they never vary; the hero-unit ("days") and hero-chip ("to beat it")
+  // pick fire up through these custom properties instead.
+  const heroStyle = {
+    "--hero-glow-1": "rgba(255, 122, 30, 0.6)",
+    "--hero-glow-2": "rgba(255, 61, 31, 0.32)",
+    "--hero-accent": "var(--fire-text)",
+    "--hero-chip-bg": "rgba(255, 122, 30, 0.18)",
+    "--hero-chip-fg": "var(--fire-text)",
+  } as React.CSSProperties;
+
   return (
-    <section className="hero" aria-labelledby="streak-h">
+    <section className="hero" style={heroStyle} aria-labelledby="streak-h">
       <div className="row" style={{ gap: 18 }}>
         <div style={{ position: "relative" }}>
           <motion.span

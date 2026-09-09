@@ -100,57 +100,79 @@ The whole design is one split:
 
 ### Why ink exists
 
-The brand orange `#FF6B00` reaches only **2.86:1 on white** — below even the
-3:1 bar for graphic marks, let alone the 4.5:1 for text. On ink it reaches
-**6.5:1**. So the accent can never be the loud element on a white card, but it
-can be on a dark one.
+Apple's iridescent violet-magenta-pink (`#B24FE0` at full strength) reaches
+only **2.7:1 on white** — the same failure a flat brand colour has. On ink it
+reads clean. So colour can never be the loud element on a white card, but it
+can be on a dark one — which is what makes "one hero per screen" and "use as
+little colour as you can get away with" the same design rather than two
+competing ones. The base is neutral by a wide margin — white paper, near-black
+ink, grey chrome — and colour is an override a screen opts into, never the
+ink surface's resting state.
 
-Giving each screen a single ink block is what lets the real brand colour be
-used at full strength. The visual hierarchy and the colour system solve each
-other: Today's streak, Session Detail's scored time, League's own row, and
-Profile's all-time heatmap are all ink, and everything else on those screens
-is deliberately quieter.
+### A layered colour model, not one accent
 
-The activity heatmap is the clearest case. On ink its ramp can run all the way
-up to full brand orange, and because its backdrop no longer changes with the
-colour scheme, **one ramp serves both themes**.
+The first build used a single brand accent everywhere. That was wrong for the
+same reason the HIG warns against reusing one colour for different meanings:
+it flattens streak, competition, and "this is document X" into the same
+visual event. Four layers now, most restrictive first:
 
-### One accent, a real ramp
-
-A nine-step orange ramp (`--o-100` … `--o-900`), not one hex used flat. Which
-step gets used is decided by measured contrast, not by eye:
-
-| Use | Step | Why |
+| Layer | Colour | Where |
 |---|---|---|
-| Brand, glows, text on ink | `--o-500` `#FF6B00` | 6.5:1 on ink |
-| Graphic marks on light | `--o-600` `#E35A00` | 3.67:1 on white |
-| Chart bars on light | `#F26100` → `--o-700` | both stops clear 3:1 |
-| Text and links on light | `#A03E00` | 4.5:1 on white *and* on the mesh-tinted ground |
+| **Neutral** (default) | white/black/grey | Everything: labels, numbers, chrome, badges, bars |
+| **Prism** (the app's own default) | violet → magenta → pink, a real gradient | Profile's heatmap (the one hero with no semantic of its own), glass rims, the glow beneath the tab bar, the active tab pill |
+| **Fire** (streak's own colour) | amber → red-orange | Today's hero, the ember — nowhere else |
+| **Gold** (league's own colour) | podium gold | League's hero, the race track, your row, the rank-1 number |
+| **Document** (quiet identifier) | one of 5 blue-cyan hues, hashed from the name | A small dot on session rows, the accent on Session Detail's hero |
 
-Green and red appear only for league movement, and never alone — every
-indicator carries an arrow, a number, and a colour, so it survives colour
-blindness and greyscale. On ink both are lightened, because the light-mode
-green is far too dark against it.
+Verified green / unverified neutral / league movement up-green-down-red are
+untouched — they were already correct.
+
+Prism never touches text — `#B24FE0` fails exactly like the old flat orange
+did — so the tab pill's label stays neutral and only the translucent capsule
+behind it carries colour. Fire and gold are exceptions on their own hero:
+there the colour *is* the meaning (a streak is a flame, a leaderboard is a
+podium), so `--hero-accent`/`--hero-chip-bg` custom properties let those two
+screens override prism's default glow without a second CSS block — Profile
+sets nothing and gets prism, which is deliberate.
+
+Document colour is the one entirely new placement: `src/lib/docColor.ts`
+hashes a document's name to one of 5 curated blue-cyan hues (FNV-1a, stable
+forever). Five, not six — a sixth hue in that family couldn't be made to
+clear 3:1 against both a white *and* a dark card at once, and the brief's own
+rule is to shrink the set rather than weaken the test. A hash collision just
+means two documents quietly share a colour.
+
+Twelve badges do NOT each get a colour: an earned-badge disc is neutral, with
+one exception — a flame/flame2 glyph tints its own icon fire, even on the
+neutral disc, because "the flame mark uses fire" wherever it appears. That
+restraint is deliberate: Profile's one coloured moment is the heatmap, and a
+dozen colourful badge discs on the same screen would be the opposite of "one
+or two coloured moments, not five."
 
 ### Making the glass visible
 
-Glass over flat white is indistinguishable from a grey rectangle. Three layers
+Glass over flat white is indistinguishable from a grey rectangle. Two layers
 give it something to bend:
 
-1. A fixed **mesh** of soft accent washes behind all content.
-2. A **scroll edge** at each screen edge that dissolves content into the ground
+1. A **scroll edge** at each screen edge that dissolves content into the ground
    with a progressive blur ramping toward the bar — straight out of
    HIG > Liquid Glass: *"Background content is blurred and reduced in opacity
    at scroll edges to enhance legibility."*
-3. A warm **glow re-laid on top of that fade**, between it and the tab bar.
+2. A prism **glow re-laid on top of that fade**, between it and the tab bar —
+   two off-centre stops (violet, pink) plus a magenta core, light dispersing
+   through glass rather than a flat tint.
 
-Step 3 matters: the scroll edge that stops content ghosting through the chrome
-would otherwise also erase the mesh, leaving the bar floating over flat paint
-again. The glow is the layer that makes the glass read as glass.
+The glow matters twice over. First, the scroll edge that stops content
+ghosting through the chrome would otherwise erase any colour wash underneath
+it too, leaving the bar floating over flat paint again — re-laying the glow
+*on top of* the fade is what fixes that. Second, it's deliberately the only
+place prism washes the page: the nav bar over plain scrolled content stays
+clear glass with nothing to bend, which is both more restrained and closer to
+how real Liquid Glass behaves (it tints from what's actually behind it, not
+from a fake wash painted everywhere).
 
-That combination is also the fix for content ghosting through the tab bar.
-Pushing the tint toward opaque would have worked too, but then it stops being
-glass.
+Pushing the tint toward opaque would also have fixed the ghosting. But then it
+stops being glass.
 
 ### Motion
 
@@ -178,20 +200,25 @@ Two structural notes:
 ### Accessibility is enforced, not asserted
 
 `npm run contrast` composites every translucent surface over what is actually
-behind it — ground, mesh, and glow — before measuring, so "AA against its real
-backdrop" is a check rather than a claim. All text clears 4.5:1 and all graphic
-marks clear 3:1 in both themes, including white glyphs on orange discs and both
-ends of every gradient.
+behind it — ground and glow — before measuring, so "AA against its real
+backdrop" is a check rather than a claim. Every layer of the colour model is
+covered: all three prism stops against the tab pill's real backdrop, fire's
+mid stop against the white ember icon it sits under, gold on ink *and* on
+paper in both themes (a single hex can't clear both when "paper" is white in
+one theme and near-black in the other), and all 5 document hues against a
+white card, a dark card, *and* the ink hero at once.
 
 It also guards against itself: the token values it measures are duplicated from
 `globals.css`, so every one is verified to literally appear in the stylesheet
 first. A failed edit that leaves the test asserting a colour the app no longer
 uses fails as `DRIFT` rather than passing while proving nothing.
 
-`prefers-reduced-transparency` drops the blur, the mesh and the glow for solid
-fills; `prefers-reduced-motion` makes everything instant and stops the ember;
-`prefers-contrast: more` tightens the palette; and an `@supports` guard covers
-browsers without `backdrop-filter`. Every interactive target is at least 44pt.
+`prefers-reduced-transparency` drops the blur and the glow for solid fills;
+`prefers-reduced-motion` makes everything instant and stops the ember;
+`prefers-contrast: more` tightens the palette (including gold's on-paper text,
+which gets its own darker/lighter override per theme); and an `@supports`
+guard covers browsers without `backdrop-filter`. Every interactive target is
+at least 44pt.
 
 ## PWA
 

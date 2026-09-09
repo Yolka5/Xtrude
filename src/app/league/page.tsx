@@ -10,6 +10,18 @@ export default function LeagueScreen() {
   const gap = leader.scoredMinutes - me.scoredMinutes;
   const others = LEAGUE.members.filter((m) => !m.isMe);
 
+  // Podium gold overrides prism on this hero - League is about competition
+  // and winning, not the app's default material. The race track and rank-1
+  // number below are gold too, hardcoded directly in globals.css since (unlike
+  // document colour) gold never varies by data.
+  const heroStyle = {
+    "--hero-glow-1": "rgba(217, 165, 61, 0.5)",
+    "--hero-glow-2": "rgba(185, 131, 42, 0.3)",
+    "--hero-accent": "var(--gold-text-on-ink)",
+    "--hero-chip-bg": "rgba(217, 165, 61, 0.18)",
+    "--hero-chip-fg": "var(--gold-text-on-ink)",
+  } as React.CSSProperties;
+
   return (
     <main className="screen">
       <h1 className="screen__title">{LEAGUE.name}</h1>
@@ -20,7 +32,7 @@ export default function LeagueScreen() {
       {/* Hero: my row, lifted out of the list so the screen reads as a race
           rather than a table. The track shows the field's spread with my
           position marked, and every other member pipped behind it. */}
-      <section className="hero" aria-labelledby="me-h">
+      <section className="hero" style={heroStyle} aria-labelledby="me-h">
         <div className="spread" style={{ alignItems: "flex-start" }}>
           <div className="stack" style={{ gap: 4 }}>
             <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
@@ -81,17 +93,27 @@ export default function LeagueScreen() {
       <ol className="rows" style={{ margin: 0, padding: 0, listStyle: "none" }}>
         {LEAGUE.members.map((m) => (
           <li key={m.id}>
-            <div className="rowitem" style={m.isMe ? { background: "var(--accent-softer)", boxShadow: "inset 3px 0 0 0 var(--accent-graphic)" } : undefined}>
-              <span className="rowitem__rank" aria-hidden="true">{m.rank}</span>
+            {/* Gold, not prism: my row and the rank-1 number are the league's
+                own "top of the table" moments, per the colour model. Both
+                are the same gold family as the hero above - reinforcing the
+                one league moment, not adding new ones. */}
+            <div className="rowitem" style={m.isMe ? { background: "rgba(217, 165, 61, 0.10)", boxShadow: "inset 3px 0 0 0 var(--gold-3)" } : undefined}>
+              <span
+                className="rowitem__rank"
+                aria-hidden="true"
+                style={m.rank === 1 ? { color: "var(--gold-text-on-light)", fontWeight: 800 } : undefined}
+              >
+                {m.rank}
+              </span>
               <span
                 className="avatar"
-                style={m.isMe ? { background: "var(--disc)", color: "#fff" } : undefined}
+                style={m.isMe ? { background: "var(--gold-graphic)", color: "#fff" } : undefined}
                 aria-hidden="true"
               >
                 {m.initials}
               </span>
               <span className="rowitem__grow stack" style={{ gap: 2 }}>
-                <span className="rowitem__name" style={m.isMe ? { color: "var(--accent-text)", fontWeight: 700 } : undefined}>
+                <span className="rowitem__name" style={m.isMe ? { color: "var(--gold-text-on-light)", fontWeight: 700 } : undefined}>
                   {m.name}
                   {m.isMe ? <span className="sr-only"> (you)</span> : null}
                 </span>

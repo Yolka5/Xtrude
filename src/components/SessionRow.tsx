@@ -3,6 +3,29 @@ import { Pressable } from "./Pressable";
 import type { Session } from "@/lib/fixtures";
 import { clockTime, duration, durationSpoken, plural } from "@/lib/format";
 import { Icon } from "./Icon";
+import { docColor } from "@/lib/docColor";
+
+/**
+ * The document-colour dot: the "small colour indicator on session rows" the
+ * colour model calls for. Deliberately just a dot, not a recoloured avatar -
+ * the avatar circle keeps signalling verified/unverified (via the existing
+ * green tint, unchanged), so this is a second, independent signal rather than
+ * overloading one circle with two meanings.
+ */
+export function DocDot({ name }: { name: string }) {
+  return (
+    <span
+      aria-hidden="true"
+      style={{
+        width: 8,
+        height: 8,
+        borderRadius: 999,
+        flex: "none",
+        background: docColor(name).dot,
+      }}
+    />
+  );
+}
 
 /**
  * Small overlay chip. Takes an ink variant, because the deep hero surface
@@ -39,14 +62,22 @@ export function SessionRow({ session }: { session: Session }) {
     <Link href={`/sessions/${session.id}/`} className="rowitem">
       <span
         className="avatar"
-        style={{ width: 34, height: 34, background: session.verified ? "var(--accent-soft)" : "var(--surface-3)", color: session.verified ? "var(--accent-text)" : "var(--label-3)" }}
+        style={{
+          width: 34,
+          height: 34,
+          background: session.verified ? "color-mix(in srgb, var(--pos) 14%, transparent)" : "var(--surface-3)",
+          color: session.verified ? "var(--pos)" : "var(--label-3)",
+        }}
         aria-hidden="true"
       >
         <Icon name={session.verified ? "verified" : "doc"} size={17} />
       </span>
       <span className="rowitem__grow stack" style={{ gap: 2 }}>
-        <span className="rowitem__name" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-          {docs}
+        <span className="row" style={{ gap: 6 }}>
+          <DocDot name={session.documents[0].name} />
+          <span className="rowitem__name" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            {docs}
+          </span>
         </span>
         <span className="rowitem__meta">
           {clockTime(session.start)} &middot; {plural(session.eventCount, "edit")}
@@ -68,8 +99,11 @@ export function RecentSessionCard({ session }: { session: Session }) {
       <Link href={`/sessions/${session.id}/`} className="card" style={{ display: "block", color: "inherit" }}>
       <div className="spread" style={{ alignItems: "flex-start" }}>
         <div className="stack" style={{ gap: 3, minWidth: 0 }}>
-          <span className="t-headline" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-            {session.documents[0].name}
+          <span className="row" style={{ gap: 6 }}>
+            <DocDot name={session.documents[0].name} />
+            <span className="t-headline" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              {session.documents[0].name}
+            </span>
           </span>
           <span className="t-footnote dim">
             {clockTime(session.start)} &ndash; {clockTime(session.end)}
@@ -82,7 +116,7 @@ export function RecentSessionCard({ session }: { session: Session }) {
 
       <div className="row" style={{ gap: 0, justifyContent: "space-between" }}>
         <div className="stack" style={{ gap: 1 }}>
-          <span className="stat-value" style={{ fontSize: 24, color: "var(--accent-text)" }}>
+          <span className="stat-value" style={{ fontSize: 24 }}>
             <span aria-hidden="true">{duration(session.scoredMinutes)}</span>
             <span className="sr-only">{durationSpoken(session.scoredMinutes)}</span>
           </span>

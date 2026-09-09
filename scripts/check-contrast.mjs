@@ -3,12 +3,16 @@
  *
  * Run: node scripts/check-contrast.mjs
  *
- * The point of this file is the phrase "against its actual backdrop". Glass
- * surfaces are semi-transparent, so a label on the tab bar is not being read
- * against the tint - it is being read against the tint composited over
- * whatever ground is behind it. This composites first, then measures.
+ * Every colour pairing the app actually renders is checked here: text on its
+ * real backdrop (composited, not idealised), every prism/fire/gold gradient
+ * stop, and every generated document colour - both graphic (3:1) and
+ * text-on-ink (4.5:1) uses, in both themes.
+ *
+ * A DRIFT guard also verifies every value below literally appears in
+ * globals.css or docColor.ts, so a failed edit that leaves this file
+ * asserting a colour the app no longer uses fails loudly instead of passing
+ * while proving nothing.
  */
-
 import { readFileSync } from "node:fs";
 
 const hex = (h) => {
@@ -39,86 +43,13 @@ const lum = (c) => {
   return 0.2126 * f(c[0]) + 0.7152 * f(c[1]) + 0.0722 * f(c[2]);
 };
 const ratio = (a, b) => {
-  const [x, y] = [lum(parse(a)), lum(parse(b))];
+  const x = lum(parse(a)), y = lum(parse(b));
   const [hi, lo] = x > y ? [x, y] : [y, x];
   return (hi + 0.05) / (lo + 0.05);
 };
 
-const L = {
-  ground: "#f6f3ef", surface: "#ffffff", surface2: "#f4f0eb", surface3: "#e9e3db",
-  label: "#1c1712", label2: "#574f47", label3: "#5f574e",
-  accentGraphic: "#e35a00", accentText: "#a03e00",
-  pos: "#15703f", neg: "#a8322a",
-  glassTint: "rgba(255,252,248,0.72)", chromeSolid: "#fdfaf6",
-  mesh: "rgba(255,107,0,0.26)", glow: "rgba(255,107,0,0.42)",
-  barTop: "#f26100", barBottom: "#cc4e00",
-  discTop: "#e35a00", discBottom: "#b84600",
-};
-const D = {
-  ground: "#0c0a08", surface: "#1a1612", surface2: "#241f19", surface3: "#322a22",
-  label: "#fdfbf9", label2: "#b9ada0", label3: "#a99d90",
-  accentGraphic: "#ff7a1f", accentText: "#ff9e57",
-  pos: "#4fd786", neg: "#ff8f85",
-  glassTint: "rgba(30,24,18,0.62)", chromeSolid: "#1b1611",
-  mesh: "rgba(255,107,0,0.30)", glow: "rgba(255,107,0,0.38)",
-  barTop: "#ff8c3d", barBottom: "#ff6b00",
-  discTop: "#e35a00", discBottom: "#b84600",
-};
-
-/* The ink hero and its activity ramp are the same in both themes, except that
-   dark mode raises the hero surface so it lifts off a near-black ground. */
-const INK = { light: "#17120d", dark: "#241b13" };
-const HEAT = ["#2a231b", "#6b3a10", "#a8570c", "#e0700a", "#ff8f2e"];
-const ON_INK = {
-  label: "#ffffff",
-  label2: "rgba(255,236,220,0.78)",
-  label3: "rgba(255,236,220,0.60)",
-  brand: "#ff6b00",
-  unit: "#ffb87f",
-  pos: "#6ee7a0",
-  neg: "#ff9d94",
-};
-
-/* Worst case for the chrome: the mesh is at its most saturated directly under
-   the floating tab bar, which is exactly where the tab labels sit. Composite
-   the mesh over the ground, then the glass tint over that, and measure the
-   labels against THAT - not against an idealised flat background. */
-// The tab bar's true backdrop is the ground, plus the mesh, plus the warm glow
-// re-laid over the scroll-edge fade. All three, then the tint.
-const washL = over(L.glow, over(L.mesh, L.ground));
-const washD = over(D.glow, over(D.mesh, D.ground));
-const glassL = over(L.glassTint, washL);
-const glassD = over(D.glassTint, washD);
-
-const AA = 4.5, AA_LARGE = 3.0, GRAPHIC = 3.0;
+const AA = 4.5, GRAPHIC = 3.0;
 let fails = 0;
-
-/* --------------------------------------------------------------------------
-   Guard against the table above drifting away from the stylesheet.
-
-   These values are duplicated from globals.css, which means a failed edit can
-   leave this file asserting a colour the app does not actually use - a test
-   that passes while proving nothing. Every value is therefore checked for its
-   literal presence in the stylesheet before any contrast is measured.
-   -------------------------------------------------------------------------- */
-const css = readFileSync(new URL("../src/app/globals.css", import.meta.url), "utf8");
-const norm = (v) => v.replace(/\s+/g, "").toLowerCase();
-const cssTokens = norm(css);
-
-function assertInCss(label, value) {
-  if (!cssTokens.includes(norm(value))) {
-    console.log(`DRIFT  ${label} = ${value} does not appear in globals.css`);
-    fails++;
-  }
-}
-for (const [mode, T] of [["light", L], ["dark", D]]) {
-  for (const [k, v] of Object.entries(T)) {
-    if (typeof v === "string") assertInCss(`${mode}.${k}`, v);
-  }
-}
-for (const [k, v] of Object.entries(INK)) assertInCss(`ink.${k}`, v);
-HEAT.forEach((v, i) => assertInCss(`heat-${i}`, v));
-if (fails) console.log("");
 
 const check = (name, fg, bg, min) => {
   const r = ratio(fg, bg);
@@ -133,67 +64,170 @@ const check = (name, fg, bg, min) => {
   );
 };
 
-for (const [mode, T, glass] of [["LIGHT", L, glassL], ["DARK", D, glassD]]) {
+/* --------------------------------------------------------------------------
+   Tokens, duplicated from globals.css / docColor.ts for measurement. The
+   DRIFT guard below (not a formality - see the bottom of this file) verifies
+   every one of these literally appears in the source, so a value here that
+   the app doesn't actually use fails loudly rather than passing quietly.
+   -------------------------------------------------------------------------- */
+
+const L = {
+  ground: "#f2f2f5", surface: "#ffffff", surface2: "#f1f1f4", surface3: "#e6e6ea",
+  label: "#17171a", label2: "#57575d", label3: "#5c5c62",
+  pos: "#15703f", neg: "#a8322a",
+  glassTint: "rgba(255, 255, 255, 0.74)",
+  chromeSolid: "#fafafc",
+  barTop: "#4b4b52", barBottom: "#2b2b30",
+  discNeutral: "#2b2b30",
+  goldTextOnLight: "#8a6116",
+};
+const D = {
+  ground: "#0a0a0c", surface: "#19191c", surface2: "#232326", surface3: "#313134",
+  label: "#fcfcfd", label2: "#b6b6bb", label3: "#a3a3a9",
+  pos: "#4fd786", neg: "#ff8f85",
+  glassTint: "rgba(22, 22, 26, 0.62)",
+  chromeSolid: "#1a1a1d",
+  barTop: "#d6d6da", barBottom: "#9c9ca3",
+  discNeutral: "#38383e",
+  goldTextOnLight: "#f0c25c",
+};
+const INK = { light: "#131316", dark: "#1e1e22" };
+
+const PRISM = { 1: "#6e5af0", 2: "#b24fe0", 3: "#ff5fa8" };
+const FIRE = { 1: "#ffb238", 2: "#f55200", 3: "#ff3d1f", text: "#ffc266" };
+const GOLD = { 1: "#f6d374", 2: "#d9a53d", 3: "#b9832a", textOnInk: "#f6d374" };
+const HEAT = ["#2b2632", "#4a3470", "#7a3fa8", "#b24fe0", "#ff5fa8"];
+
+/** Document hue set - must match src/lib/docColor.ts exactly. */
+const DOCS = [
+  { dot: "#2494bc", onInk: "#3ab3df" },
+  { dot: "#3190d8", onInk: "#3a97df" },
+  { dot: "#4b8add", onInk: "#4287e0" },
+  { dot: "#4b77dd", onInk: "#5882e4" },
+  { dot: "#4b63dd", onInk: "#6a7fe7" },
+];
+
+const glowPrismL = "rgba(178, 79, 224, 0.30)";
+const glowPrismD = "rgba(178, 79, 224, 0.34)";
+
+for (const [mode, T, ink, glowPrism] of [
+  ["LIGHT", L, INK.light, glowPrismL],
+  ["DARK", D, INK.dark, glowPrismD],
+]) {
   console.log(`\n=== ${mode} ===`);
-  const ink = mode === "LIGHT" ? INK.light : INK.dark;
+
   console.log("-- text on solid content surfaces (the numbers) --");
-  check("label on card",              T.label,  T.surface,  AA);
-  check("label-2 on card",            T.label2, T.surface,  AA);
-  check("label-3 on card",            T.label3, T.surface,  AA);
-  check("label-2 on ground",          T.label2, T.ground,   AA);
-  check("label-3 on ground",          T.label3, T.ground,   AA);
-  // Section headings and subtitles sit on the bare ground, which the mesh
-  // tints. Measure them where the mesh is strongest, not on flat paint.
-  check("label-2 on ground+mesh",     T.label2, over(T.mesh, T.ground), AA);
-  check("label-3 on ground+mesh",     T.label3, over(T.mesh, T.ground), AA);
-  check("accent-text on ground+mesh", T.accentText, over(T.mesh, T.ground), AA);
-  check("label-2 on surface-2",       T.label2, T.surface2, AA);
-  check("label-3 on surface-2",       T.label3, T.surface2, AA);
-  check("accent-text on card",        T.accentText, T.surface,  AA);
-  check("accent-text on ground",      T.accentText, T.ground,   AA);
-  check("accent-text on surface-2",   T.accentText, T.surface2, AA);
-  check("positive on card",           T.pos,    T.surface,  AA);
-  check("negative on card",           T.neg,    T.surface,  AA);
+  check("label on card", T.label, T.surface, AA);
+  check("label-2 on card", T.label2, T.surface, AA);
+  check("label-3 on card", T.label3, T.surface, AA);
+  check("label-2 on ground", T.label2, T.ground, AA);
+  check("label-3 on ground", T.label3, T.ground, AA);
+  check("label-2 on surface-2", T.label2, T.surface2, AA);
+  check("label-3 on surface-2", T.label3, T.surface2, AA);
+  check("label as link on card", T.label, T.surface, AA);
+  check("label as link on ground", T.label, T.ground, AA);
+  check("positive on card", T.pos, T.surface, AA);
+  check("negative on card", T.neg, T.surface, AA);
+  check("white on ink", "#ffffff", ink, AA);
 
-  console.log("-- text on GLASS, composited over the ground wash --");
-  check("label on glass",             T.label,      glass, AA);
-  check("label-2 on glass",           T.label2,     glass, AA);
-  check("label-3 on glass (tab idle)",T.label3,     glass, AA);
-  check("accent-text on glass",       T.accentText, glass, AA);
+  console.log("-- reduced-transparency solid fallback --");
+  check("label-3 on chrome-solid", T.label3, T.chromeSolid, AA);
+  check("label on chrome-solid (link/focus)", T.label, T.chromeSolid, AA);
 
-  console.log("-- text on the reduced-transparency solid fallback --");
-  check("label-3 on chrome-solid",    T.label3,     T.chromeSolid, AA);
-  check("accent-text on chrome-solid",T.accentText, T.chromeSolid, AA);
+  console.log("-- glass chrome: label on the tab bar's real backdrop --");
+  // Worst case: the bottom glow (which the tab bar sits directly above)
+  // composited under the glass tint. This is what a label actually reads
+  // against, not an idealised flat colour.
+  const glowComposite = over(glowPrism, T.ground);
+  const glassComposite = over(T.glassTint, glowComposite);
+  check("label on glass (tab bar over glow)", T.label, glassComposite, AA);
+  check("label-3 on glass (inactive tab)", T.label3, glassComposite, AA);
 
-  console.log("-- text on the INK hero (where the brand orange is legible) --");
-  check("white on ink",               ON_INK.label,  ink, AA);
-  check("hero secondary on ink",      ON_INK.label2, ink, AA);
-  check("hero tertiary on ink",       ON_INK.label3, ink, AA);
-  check("BRAND #ff6b00 on ink",       ON_INK.brand,  ink, AA);
-  check("hero unit on ink",           ON_INK.unit,   ink, AA);
-  check("hero positive on ink",       ON_INK.pos,    ink, AA);
-  check("hero negative on ink",       ON_INK.neg,    ink, AA);
+  console.log("-- active tab pill: label on the prism wash, every stop --");
+  for (const [name, stop] of [["violet", PRISM[1]], ["magenta", PRISM[2]], ["pink", PRISM[3]]]) {
+    const [r, g, b] = hex(stop);
+    const wash = `rgba(${r}, ${g}, ${b}, 0.30)`;
+    const pillComposite = over(wash, glassComposite);
+    check(`label on ${name} pill`, T.label, pillComposite, AA);
+  }
 
-  console.log("-- graphic objects (3:1) --");
-  // A gradient bar has to clear the bar at BOTH ends, not just where it is
-  // darkest - the light end is the one that fails on white.
-  check("bar gradient top on card",   T.barTop,    T.surface, GRAPHIC);
-  check("bar gradient base on card",  T.barBottom, T.surface, GRAPHIC);
-  check("accent graphic on card",     T.accentGraphic, T.surface, GRAPHIC);
-  // White glyphs and initials ride on these gradients, so the lightest stop
-  // of the disc has to clear the bar too.
-  check("white glyph on disc (light end)", "#ffffff", T.discTop,    GRAPHIC);
-  check("white glyph on disc (dark end)",  "#ffffff", T.discBottom, GRAPHIC);
+  console.log("-- FIRE (streak hero) --");
+  check("fire-text on ink", FIRE.text, ink, AA);
+  check("white on ember (fire-2 mid stop)", "#ffffff", FIRE[2], GRAPHIC);
+  check("fire-text on neutral badge disc", FIRE.text, T.discNeutral, GRAPHIC);
 
-  console.log("-- activity ramp, on ink in both themes --");
-  check("empty cell vs ink",          HEAT[0], ink, 1.05);
-  // The lightest step must be clearly heavier than "no activity", or a day
-  // with work reads as emptier than a day without.
-  check("step 1 vs empty",            HEAT[1], HEAT[0], 1.35);
-  check("step 2 vs step 1",           HEAT[2], HEAT[1], 1.2);
-  check("step 3 vs step 2",           HEAT[3], HEAT[2], 1.2);
-  check("step 4 vs step 3",           HEAT[4], HEAT[3], 1.15);
+  console.log("-- GOLD (league hero + standings) --");
+  check("gold-text-on-ink on ink", GOLD.textOnInk, ink, AA);
+  check("gold-text-on-light on card", T.goldTextOnLight, T.surface, AA);
+  // "me" row tints the card with a light gold wash - verify against THAT,
+  // not the plain card, since that is what the name text actually sits on.
+  const meRowBg = over("rgba(217, 165, 61, 0.10)", T.surface);
+  check("gold-text-on-light on 'me' row tint", T.goldTextOnLight, meRowBg, AA);
+  check("white on gold-graphic (light end, gold-3)", "#ffffff", GOLD[3], GRAPHIC);
+  check("white on gold-graphic (dark end, #8a6116)", "#ffffff", "#8a6116", GRAPHIC);
+
+  console.log("-- DOCUMENT colours --");
+  DOCS.forEach((d, i) => {
+    check(`doc[${i}] dot vs card`, d.dot, T.surface, GRAPHIC);
+    check(`doc[${i}] dot vs ground`, d.dot, T.ground, GRAPHIC);
+    check(`doc[${i}] onInk vs ink (hero accent/deltabar)`, d.onInk, ink, AA);
+  });
+
+  console.log("-- graphic objects: chart bars (3:1, both stops) --");
+  check("bar-top vs card", T.barTop, T.surface, GRAPHIC);
+  check("bar-bottom vs card", T.barBottom, T.surface, GRAPHIC);
+  check("white on badge disc (neutral)", "#ffffff", T.discNeutral, GRAPHIC);
+
+  console.log("-- activity ramp: prism as an intensity scale, on ink --");
+  check("heat-0 (empty) vs ink", HEAT[0], ink, 1.05);
+  check("heat-1 vs heat-0 (empty)", HEAT[1], HEAT[0], 1.35);
+  check("heat-2 vs heat-1", HEAT[2], HEAT[1], 1.2);
+  check("heat-3 vs heat-2", HEAT[3], HEAT[2], 1.2);
+  check("heat-4 vs heat-3", HEAT[4], HEAT[3], 1.15);
 }
+
+console.log("\n=== movement on ink (unchanged, re-verified against new ink) ===");
+for (const ink of [INK.light, INK.dark]) {
+  check("move--up (#6ee7a0) on ink", "#6ee7a0", ink, AA);
+  check("move--down (#ff9d94) on ink", "#ff9d94", ink, AA);
+}
+
+/* --------------------------------------------------------------------------
+   DRIFT guard: every colour measured above must literally appear in the
+   files that actually ship it, or this test is asserting fiction.
+   -------------------------------------------------------------------------- */
+const css = readFileSync(new URL("../src/app/globals.css", import.meta.url), "utf8");
+const docColorSrc = readFileSync(new URL("../src/lib/docColor.ts", import.meta.url), "utf8");
+const norm = (v) => v.replace(/\s+/g, "").toLowerCase();
+const cssTokens = norm(css);
+const docTokens = norm(docColorSrc);
+
+function assertInCss(label, value, haystack = cssTokens) {
+  if (!haystack.includes(norm(value))) {
+    console.log(`DRIFT  ${label} = ${value} does not appear in its source file`);
+    fails++;
+  }
+}
+
+console.log("\n=== drift guard ===");
+for (const [mode, T] of [["light", L], ["dark", D]]) {
+  for (const [k, v] of Object.entries(T)) {
+    if (typeof v === "string") assertInCss(`${mode}.${k}`, v);
+  }
+}
+assertInCss("ink.light", INK.light);
+assertInCss("ink.dark", INK.dark);
+for (const [k, v] of Object.entries(PRISM)) assertInCss(`prism.${k}`, v);
+for (const [k, v] of Object.entries(FIRE)) assertInCss(`fire.${k}`, v);
+for (const [k, v] of Object.entries(GOLD)) assertInCss(`gold.${k}`, v);
+HEAT.forEach((v, i) => assertInCss(`heat-${i}`, v));
+DOCS.forEach((d, i) => {
+  assertInCss(`doc[${i}].dot`, d.dot, docTokens);
+  assertInCss(`doc[${i}].onInk`, d.onInk, docTokens);
+});
+assertInCss("glow-prism (light)", glowPrismL);
+assertInCss("glow-prism (dark)", glowPrismD);
+if (!fails) console.log("  all tokens found in source");
 
 console.log(fails === 0 ? "\nAll checks pass.\n" : `\n${fails} FAILING.\n`);
 process.exit(fails === 0 ? 0 : 1);
