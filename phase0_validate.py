@@ -41,7 +41,7 @@ MIN_EVENTS = 3                  # fewer events than this is noise, not a session
 # Your local UTC offset, in hours, used only for display.
 # Onshape returns UTC. Set this so the session times read the way you
 # remember them (e.g. 3 for UTC+3, -5 for UTC-5). 0 = show raw UTC.
-DISPLAY_TZ_OFFSET_HOURS = 0
+DISPLAY_TZ_OFFSET_HOURS = 3
 
 
 # ---------------------------------------------------------------------------
