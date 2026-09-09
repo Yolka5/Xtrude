@@ -1,0 +1,27 @@
+{
+  "name": "xtrude",
+  "version": "0.5.0",
+  "private": true,
+  "description": "Xtrude Phase 0.5 - static PWA shell with fixture data",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "npx serve out",
+    "fixtures": "node scripts/gen-fixtures.mjs",
+    "icons": "node scripts/gen-icons.mjs",
+    "postbuild": "node scripts/stamp-sw.mjs",
+    "contrast": "node scripts/check-contrast.mjs"
+  },
+  "dependencies": {
+    "motion": "^13.2.0",
+    "next": "^16.3.4",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.3",
+    "@types/react": "^19.1.2",
+    "@types/react-dom": "^19.1.2",
+    "typescript": "^5.8.3"
+  }
+}
