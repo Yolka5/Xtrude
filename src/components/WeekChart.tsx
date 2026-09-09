@@ -5,18 +5,25 @@ import { WEEK } from "@/lib/fixtures";
 import { duration, durationSpoken } from "@/lib/format";
 
 /**
- * This week, one bar per day. Content layer: solid card, opaque axis labels.
+ * This week, one bar per day.
  *
  * The scale steps in 15-minute increments from a 45-minute floor rather than
  * auto-scaling to the week's own max. Sessions here run 5-25 minutes, so a
  * free-floating scale would make a 27-minute Monday and a 28-minute Tuesday
  * look wildly different.
  *
- * Bars use a gradient whose lightest stop still clears 3:1 against the white
- * card, so the whole mark meets the graphic-object bar, not just its base.
+ * Bars don't just grow - they shoot past full height, squash flat on
+ * landing, then settle with a small correction bounce. That's squash and
+ * stretch (Disney's second animation principle) rather than a spring for its
+ * own sake: a keyframed scaleY/scaleX pair, staggered per bar so the eye
+ * reads it as one wave landing left to right.
  */
 const FLOOR = 45;
 const STEP = 15;
+
+const GROW_Y = [0, 1.22, 0.86, 1.05, 1];
+const GROW_X = [1, 0.94, 1.14, 0.97, 1];
+const GROW_TIMES = [0, 0.42, 0.62, 0.82, 1];
 
 export function WeekChart() {
   const max = Math.max(...WEEK.map((d) => d.scoredMinutes));
@@ -51,12 +58,9 @@ export function WeekChart() {
               <motion.div
                 className={"weekchart__bar" + (d.scoredMinutes === 0 ? " weekchart__bar--empty" : "")}
                 style={{ height: d.scoredMinutes === 0 ? 4 : `${pct}%` }}
-                initial={{ scaleY: 0 }}
-                animate={{ scaleY: 1 }}
-                transition={{
-                  type: "spring", stiffness: 150, damping: 19, mass: 0.9,
-                  delay: 0.08 + i * 0.055,
-                }}
+                initial={{ scaleY: 0, scaleX: 1 }}
+                animate={{ scaleY: GROW_Y, scaleX: GROW_X }}
+                transition={{ duration: 0.64, times: GROW_TIMES, delay: 0.12 + i * 0.075, ease: "easeOut" }}
               />
             </div>
             <span className="weekchart__day">{d.label}</span>

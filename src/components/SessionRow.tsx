@@ -1,5 +1,8 @@
+"use client";
+
 import Link from "next/link";
-import { Pressable } from "./Pressable";
+import { motion, useReducedMotion } from "motion/react";
+import { Chunky } from "./Chunky";
 import type { Session } from "@/lib/fixtures";
 import { clockTime, duration, durationSpoken, plural } from "@/lib/format";
 import { Icon } from "./Icon";
@@ -28,30 +31,47 @@ export function DocDot({ name }: { name: string }) {
 }
 
 /**
- * Small overlay chip. Takes an ink variant, because the deep hero surface
- * needs lightened semantic colours to stay legible - the light-mode green is
- * far too dark against it.
+ * Small overlay chip. `onHero` swaps to a translucent-white treatment, since
+ * every hero is now a bold light gradient rather than a dark ink surface -
+ * the plain green/neutral chip styles are tuned for a white card and read as
+ * too flat sitting directly on a gradient.
+ *
+ * A verified chip stamps in rather than just fading - "a session verifying:
+ * a satisfying stamp animation." There's no live verification EVENT in a
+ * static-fixture app, so this plays on first scroll into view instead, which
+ * is the same honest substitution CountUp and the heatmap ripple make.
  */
-export function VerifiedChip({ verified, onInk = false }: { verified: boolean; onInk?: boolean }) {
-  const ink = onInk
-    ? {
-        background: verified ? "rgba(80, 220, 140, 0.16)" : "rgba(255, 236, 220, 0.13)",
-        color: verified ? "#6ee7a0" : "rgba(255, 236, 220, 0.82)",
-      }
-    : undefined;
-  if (!verified) {
-    return (
-      <span className={onInk ? "chip" : "chip chip-neutral"} style={ink}>
-        <Icon name="doc" size={13} />
-        Metadata only
-      </span>
-    );
-  }
-  return (
-    <span className={onInk ? "chip" : "chip chip-pos"} style={ink}>
+export function VerifiedChip({ verified, onHero = false }: { verified: boolean; onHero?: boolean }) {
+  // Rotate/scale are transforms - MotionConfig already neutralizes those
+  // under Reduce Motion. Opacity isn't, so left with the spring transition
+  // it would still visibly fade in; reading useReducedMotion() here only
+  // changes that transition's duration, never the JSX.
+  const reduced = useReducedMotion();
+  const cls = onHero ? "chip chip-onhero" : verified ? "chip chip-pos" : "chip chip-neutral";
+  const content = verified ? (
+    <>
       <Icon name="verified" size={13} />
       Verified
-    </span>
+    </>
+  ) : (
+    <>
+      <Icon name="doc" size={13} />
+      Metadata only
+    </>
+  );
+
+  if (!verified) return <span className={cls}>{content}</span>;
+
+  return (
+    <motion.span
+      className={cls}
+      initial={{ scale: 2.2, rotate: -14, opacity: 0 }}
+      whileInView={{ scale: 1, rotate: 0, opacity: 1 }}
+      viewport={{ once: true, amount: 0.6 }}
+      transition={reduced ? { duration: 0 } : { type: "spring", stiffness: 420, damping: 14, mass: 0.7 }}
+    >
+      {content}
+    </motion.span>
   );
 }
 
@@ -63,8 +83,8 @@ export function SessionRow({ session }: { session: Session }) {
       <span
         className="avatar"
         style={{
-          width: 34,
-          height: 34,
+          width: 36,
+          height: 36,
           background: session.verified ? "color-mix(in srgb, var(--pos) 14%, transparent)" : "var(--surface-3)",
           color: session.verified ? "var(--pos)" : "var(--label-3)",
         }}
@@ -92,49 +112,49 @@ export function SessionRow({ session }: { session: Session }) {
   );
 }
 
-/** The "most recent session" card on Today. Content layer: solid. */
+/** The "most recent session" card on Today. Chunky: it's a link, so it presses. */
 export function RecentSessionCard({ session }: { session: Session }) {
   return (
-    <Pressable>
-      <Link href={`/sessions/${session.id}/`} className="card" style={{ display: "block", color: "inherit" }}>
-      <div className="spread" style={{ alignItems: "flex-start" }}>
-        <div className="stack" style={{ gap: 3, minWidth: 0 }}>
-          <span className="row" style={{ gap: 6 }}>
-            <DocDot name={session.documents[0].name} />
-            <span className="t-headline" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-              {session.documents[0].name}
+    <Chunky className="chunk">
+      <Link href={`/sessions/${session.id}/`} style={{ display: "block", color: "inherit" }}>
+        <div className="spread" style={{ alignItems: "flex-start" }}>
+          <div className="stack" style={{ gap: 3, minWidth: 0 }}>
+            <span className="row" style={{ gap: 6 }}>
+              <DocDot name={session.documents[0].name} />
+              <span className="t-headline" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {session.documents[0].name}
+              </span>
             </span>
-          </span>
-          <span className="t-footnote dim">
-            {clockTime(session.start)} &ndash; {clockTime(session.end)}
-          </span>
+            <span className="t-footnote dim">
+              {clockTime(session.start)} &ndash; {clockTime(session.end)}
+            </span>
+          </div>
+          <VerifiedChip verified={session.verified} />
         </div>
-        <VerifiedChip verified={session.verified} />
-      </div>
 
-      <div className="divider" />
+        <div className="divider" />
 
-      <div className="row" style={{ gap: 0, justifyContent: "space-between" }}>
-        <div className="stack" style={{ gap: 1 }}>
-          <span className="stat-value" style={{ fontSize: 24 }}>
-            <span aria-hidden="true">{duration(session.scoredMinutes)}</span>
-            <span className="sr-only">{durationSpoken(session.scoredMinutes)}</span>
-          </span>
-          <span className="t-caption dimmer">scored</span>
-        </div>
-        <div className="vdivider" />
-        <div className="stack" style={{ gap: 1 }}>
-          <span className="stat-value" style={{ fontSize: 24 }}>{session.eventCount}</span>
-          <span className="t-caption dimmer">edits</span>
-        </div>
-        <div className="vdivider" />
-        <div className="stack" style={{ gap: 1 }}>
-          <span className="stat-value" style={{ fontSize: 24 }}>{session.documents.length}</span>
-          <span className="t-caption dimmer">{session.documents.length === 1 ? "document" : "documents"}</span>
-        </div>
-        <Icon name="chevron" size={17} className="dimmer" />
+        <div className="row" style={{ gap: 0, justifyContent: "space-between" }}>
+          <div className="stack" style={{ gap: 1 }}>
+            <span className="stat-value" style={{ fontSize: 26 }}>
+              <span aria-hidden="true">{duration(session.scoredMinutes)}</span>
+              <span className="sr-only">{durationSpoken(session.scoredMinutes)}</span>
+            </span>
+            <span className="t-caption dimmer">scored</span>
+          </div>
+          <div className="vdivider" />
+          <div className="stack" style={{ gap: 1 }}>
+            <span className="stat-value" style={{ fontSize: 26 }}>{session.eventCount}</span>
+            <span className="t-caption dimmer">edits</span>
+          </div>
+          <div className="vdivider" />
+          <div className="stack" style={{ gap: 1 }}>
+            <span className="stat-value" style={{ fontSize: 26 }}>{session.documents.length}</span>
+            <span className="t-caption dimmer">{session.documents.length === 1 ? "document" : "documents"}</span>
+          </div>
+          <Icon name="chevron" size={17} className="dimmer" />
         </div>
       </Link>
-    </Pressable>
+    </Chunky>
   );
 }

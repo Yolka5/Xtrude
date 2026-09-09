@@ -6,6 +6,7 @@ import { GlassDefs } from "@/components/GlassDefs";
 import { PageTransition } from "@/components/PageTransition";
 import { MotionProvider } from "@/components/MotionProvider";
 import { ServiceWorker } from "@/components/ServiceWorker";
+import { FONT_VARS } from "@/lib/fonts";
 
 export const metadata: Metadata = {
   title: "Xtrude",
@@ -39,15 +40,19 @@ export const viewport: Viewport = {
   // lets the app paint into the notch and home-indicator areas, which the
   // safe-area-inset padding then clears
   viewportFit: "cover",
-  themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#f6f3ef" },
-    { media: "(prefers-color-scheme: dark)", color: "#0c0a08" },
-  ],
+  // Light mode only, by design - see globals.css.
+  themeColor: "#f2f2f5",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    // The font variables have to live on <html>, not <body>: globals.css's
+    // `:root { --font: var(--font-nunito)... }` is evaluated for <html>, and
+    // CSS custom properties only inherit downward - a variable set on a
+    // descendant (<body>) is invisible to an ancestor's own declaration. Off
+    // by one element, and the whole stack silently fell back to the
+    // browser's serif default.
+    <html lang="en" className={FONT_VARS}>
       <body>
         <GlassDefs />
         <MotionProvider>
@@ -55,12 +60,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <div className="app">
             <PageTransition>{children}</PageTransition>
           </div>
-        {/* Scroll edges: content dissolves into the mesh before it reaches the
-            chrome, with a progressive blur ramping toward each edge. This is
-            what stops content ghosting through the glass. */}
-        <div className="edge edge-top" aria-hidden="true" />
-        <div className="edge edge-bottom" aria-hidden="true" />
-        <div className="glow-bottom" aria-hidden="true" />
+          {/* No scroll-edge fades needed anymore: the nav bar is solid once
+              stuck (glass is tab-bar only now) and fully transparent before
+              that, with nothing behind it to ghost through. */}
           <TabBar />
         </MotionProvider>
         <ServiceWorker />

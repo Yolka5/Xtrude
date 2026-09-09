@@ -85,140 +85,188 @@ the prerendered HTML the moment the day rolled over.
 
 ## The design
 
-Built to the vendored `apple-design` skill in `.claude/skills/apple-design/`,
-targeting iOS 26 Liquid Glass.
+The first two passes built this to the vendored `apple-design` skill in
+`.claude/skills/apple-design/`, targeting iOS 26 Liquid Glass: dark-mode-first,
+one glowing "ink" hero per screen, glass on every bar. It was tasteful and
+dead. This pass keeps the colour model that came out of that work — neutral
+base, three semantic overrides, one hashed document colour — and rebuilds
+everything else around a different personality: Duolingo and Finch energy
+applied to the same palette. Playful, chunky, physical, alive.
 
-### Three surface families
+### Light mode only
 
-The whole design is one split:
+Dark mode is gone, on purpose, not as an oversight. The whole point of this
+pass is bold, saturated colour used with confidence — big gradient washes, not
+a single restrained accent glowing on black. That reads as "vivid" only against
+a light, near-white ground; the same gradients on ink would have to be
+darkened back down to protect contrast, which is exactly the muted result this
+pass was reacting against. `--ground: #f2f2f5` is the only background this app
+has now.
 
-| | |
-|---|---|
-| **Glass** (functional) | Tab bar, nav bar, scroll edges, overlay chips. Translucent, blurred, floating. Never carries a value. |
-| **Paper** (content) | White / near-black cards. Solid, quiet, recessive. Everything you read a number off lives here. |
-| **Ink** (hero) | One deep, glowing block per screen. Solid, loud. |
+### Rounded, chunky, enormous type
 
-### Why ink exists
+Headings and hero numbers run in **Fredoka**; everything else in **Nunito** —
+both self-hosted via `next/font/google` so they work fully offline
+(`src/lib/fonts.ts`). Both were chosen over two other pairings (Nunito alone,
+Baloo 2 + Outfit) in a live side-by-side on the Today screen; Fredoka's
+friendlier, rounder terminals read closest to Duolingo/Finch at hero-number
+size, where Baloo felt slightly too playful for body text and Outfit's sharp
+corners fought the chunky components. Hero numbers are set enormous (64–68px)
+and heavy, because a streak or a rank is the one number per screen that should
+feel like a fact worth bragging about, not a data point.
 
-Apple's iridescent violet-magenta-pink (`#B24FE0` at full strength) reaches
-only **2.7:1 on white** — the same failure a flat brand colour has. On ink it
-reads clean. So colour can never be the loud element on a white card, but it
-can be on a dark one — which is what makes "one hero per screen" and "use as
-little colour as you can get away with" the same design rather than two
-competing ones. The base is neutral by a wide margin — white paper, near-black
-ink, grey chrome — and colour is an override a screen opts into, never the
-ink surface's resting state.
+Text itself stays dark and legible everywhere — `--label: #17171a` on white,
+and (this is the part that inverted from the previous pass) directly on every
+hero gradient too, since all three semantic gradients were tuned so dark text
+clears 4.5:1 against every stop. Colour goes in the shapes, never the words.
 
-### A layered colour model, not one accent
+### Colour, boldly, in the shapes
 
-The first build used a single brand accent everywhere. That was wrong for the
-same reason the HIG warns against reusing one colour for different meanings:
-it flattens streak, competition, and "this is document X" into the same
-visual event. Four layers now, most restrictive first:
+The layered model survives unchanged in structure — neutral base, three
+semantic overrides, one hashed document colour — but the treatment inverted.
+The previous pass used one glowing dark "ink" surface per screen because a
+saturated colour only cleared contrast against a dark background; this pass
+instead tuned every gradient stop so **dark label text sits directly on it**,
+which is what lets the hero itself be the bold, confident colour wash instead
+of a muted glow behind white text.
 
 | Layer | Colour | Where |
 |---|---|---|
-| **Neutral** (default) | white/black/grey | Everything: labels, numbers, chrome, badges, bars |
-| **Prism** (the app's own default) | violet → magenta → pink, a real gradient | Profile's heatmap (the one hero with no semantic of its own), glass rims, the glow beneath the tab bar, the active tab pill |
-| **Fire** (streak's own colour) | amber → red-orange | Today's hero, the ember — nowhere else |
-| **Gold** (league's own colour) | podium gold | League's hero, the race track, your row, the rank-1 number |
-| **Document** (quiet identifier) | one of 5 blue-cyan hues, hashed from the name | A small dot on session rows, the accent on Session Detail's hero |
+| **Neutral** (default) | white / near-black / grey | Everything: labels, chrome, badges, bars |
+| **Prism** (the app's own default) | violet → magenta → pink | Profile's hero + heatmap, the tab bar's active pill, the week chart's bars |
+| **Fire** (streak's own colour) | gold → red-orange | Today's hero, the ember — nowhere else |
+| **Gold** (league's own colour) | amber → deep gold | League's hero, the race track, your row, the rank-1 number |
+| **Document** (quiet identifier) | one of 5 blue-cyan hues, hashed from the name | A dot on session rows; Session Detail's own hero |
 
 Verified green / unverified neutral / league movement up-green-down-red are
-untouched — they were already correct.
+untouched. Every stop of every gradient — not just one representative
+"text-safe" shade — is checked against dark label text in `npm run contrast`,
+since the whole hero surface is now a colour field text can land on at any
+point.
 
-Prism never touches text — `#B24FE0` fails exactly like the old flat orange
-did — so the tab pill's label stays neutral and only the translucent capsule
-behind it carries colour. Fire and gold are exceptions on their own hero:
-there the colour *is* the meaning (a streak is a flame, a leaderboard is a
-podium), so `--hero-accent`/`--hero-chip-bg` custom properties let those two
-screens override prism's default glow without a second CSS block — Profile
-sets nothing and gets prism, which is deliberate.
+### Chunky, physical components
 
-Document colour is the one entirely new placement: `src/lib/docColor.ts`
-hashes a document's name to one of 5 curated blue-cyan hues (FNV-1a, stable
-forever). Five, not six — a sixth hue in that family couldn't be made to
-clear 3:1 against both a white *and* a dark card at once, and the brief's own
-rule is to shrink the set rather than weaken the test. A hash collision just
-means two documents quietly share a colour.
+Every card, button, hero, and badge tile (`.chunk`, `.hero`, the `Chunky`
+component) is built from the same physical metaphor: a thick block with a
+solid, slightly darker bottom edge standing in for its own depth. Press it and
+it pushes down into that edge — the shadow doesn't fade, it *disappears*,
+because the element has physically moved down to meet it. That's the Duolingo
+button feel, and it's applied to everything tappable, not just buttons:
+session rows, badge tiles, the streak ember. If it's chunky, it should look
+pressable, and if it's pressable, it presses.
 
-Twelve badges do NOT each get a colour: an earned-badge disc is neutral, with
-one exception — a flame/flame2 glyph tints its own icon fire, even on the
-neutral disc, because "the flame mark uses fire" wherever it appears. That
-restraint is deliberate: Profile's one coloured moment is the heatmap, and a
-dozen colourful badge discs on the same screen would be the opposite of "one
-or two coloured moments, not five."
+### Motion past reasonable, on purpose
 
-### Making the glass visible
+Every animation in this pass leans on a cartoon principle rather than a
+reasonable ease curve, because the brief was explicit: if a motion feels
+tasteful, it's wrong. Concretely:
 
-Glass over flat white is indistinguishable from a grey rectangle. Two layers
-give it something to bend:
+- **Numbers** (`CountUp`) hit their target via a low-damping spring rather than
+  a linear count, so they overshoot past the real value and wobble down to
+  rest — anticipation and overshoot, not a clean ramp.
+- **Chart bars** (`WeekChart`) shoot past full height, squash flat on landing,
+  then correct with a small bounce — squash and stretch, staggered per bar so
+  the eye reads one wave landing left to right.
+- **Cards** (`TiltHero`) tilt in 3D toward the pointer/touch position and
+  compress slightly on press, so a hero block reads as a physical object with
+  weight rather than a flat rectangle.
+- **Tab switches** (`PageTransition` + `FlyItem`) are not a cross-fade: the
+  outgoing screen's blocks fly up and out in a fast staggered cascade, the
+  incoming screen's fly in from below, staggered the other way.
+- **The activity heatmap** (`ActivityHeatmap`) ripples in from the most recent
+  cell outward, timed by each cell's actual distance from that point, rather
+  than a flat row-by-row reveal.
+- **The streak ember** (`StreakHero`) never sits still — an irregular flicker
+  loop runs constantly, the one looping animation in the app, because a streak
+  is the one thing that should feel alive — and tapping it punches into a
+  bigger burst with confetti and a haptic.
+- **League rows** (`league/page.tsx`) physically swap into place on load, each
+  one offset by exactly how far its rank moved since last week and springing
+  into its current slot; your own row flashes gold once it settles — an
+  honest illustration of fixture data (`lastRank` vs. `rank`), not a fabricated
+  live event.
+- **Pull-to-refresh** (`PullToRefresh`) does something deliberately absurd:
+  there's nothing to refresh in a static-fixture app, so pulling past the
+  threshold fires a full confetti burst and a silly, honest message ("Still
+  exactly 14 days. Go extrude something.") instead of faking a spinner.
 
-1. A **scroll edge** at each screen edge that dissolves content into the ground
-   with a progressive blur ramping toward the bar — straight out of
-   HIG > Liquid Glass: *"Background content is blurred and reduced in opacity
-   at scroll edges to enhance legibility."*
-2. A prism **glow re-laid on top of that fade**, between it and the tab bar —
-   two off-centre stops (violet, pink) plus a magenta core, light dispersing
-   through glass rather than a flat tint.
+### Celebration moments
 
-The glow matters twice over. First, the scroll edge that stops content
-ghosting through the chrome would otherwise erase any colour wash underneath
-it too, leaving the bar floating over flat paint again — re-laying the glow
-*on top of* the fade is what fixes that. Second, it's deliberately the only
-place prism washes the page: the nav bar over plain scrolled content stays
-clear glass with nothing to bend, which is both more restrained and closer to
-how real Liquid Glass behaves (it tints from what's actually behind it, not
-from a fake wash painted everywhere).
+Four places now have an explicit celebration, all tap-triggered rather than
+event-triggered — there's no live state to react to in a fixtures-only app, so
+the honest substitute is letting the user re-trigger the moment themselves:
+tapping the streak ember, tapping an earned badge or a lifetime stat on
+Profile, and the first-scroll-into-view stamp on a verified session chip.
+Each pairs a haptic (`src/lib/haptics.ts`, feature-detected against the
+Vibration API, silently absent on iOS/desktop) with a `canvas-confetti` burst
+positioned at the element that triggered it.
 
-Pushing the tint toward opaque would also have fixed the ghosting. But then it
-stops being glass.
+### Real glass, tab bar only
 
-### Motion
+Every other glass surface from the previous pass — nav bar, scroll-edge fades,
+overlay chips — is gone; only the tab bar is glass now. It uses an actual SVG
+displacement filter (`GlassDefs.tsx`: `feTurbulence` → `feGaussianBlur` →
+`feDisplacementMap`), referenced from `backdrop-filter: blur(14px)
+url(#xtr-glass-distort) saturate(180%)`, for genuine refraction rather than a
+flat frosted blur — Chrome/Android supports SVG filters inside
+`backdrop-filter`. An `@supports` guard falls back to a plain frosted blur
+everywhere that doesn't (Safari included), and `prefers-reduced-transparency`
+drops both in favour of a solid fill.
 
-Spring physics via `motion`, not linear fades. Numbers count up on first scroll
-into view, chart bars grow from the baseline on a staggered spring, cards scale
-to 0.97 under the finger and spring back, the tab bar's selection pill morphs
-between tabs on a shared `layoutId`, screens cross-fade, heatmap cells stagger
-in by column, and the streak ember carries a slow idle breath — the only
-looping animation in the app, because a streak is the one thing that should
-feel alive.
+### A mascot, proposed but not built
 
-Two structural notes:
+Three CAD-native character sketches were proposed for a future pass — an
+extrusion (a sketch circle extruded into a body, wearing a face), a filleted
+block (a `.chunk` come to life), and a bearing/washer ring — each simple SVGs,
+each deliberately not wired into the app yet. See the sketches sent alongside
+this work.
+
+### Motion is instant and calm for anyone who asked for that
+
+`prefers-reduced-motion` doesn't just make things a little calmer here — every
+one of the effects above collapses to instant. That took more than
+`MotionConfig`'s `reducedMotion="user"`: Motion's own reduced-motion handling
+neutralizes transform (`x`/`y`/`scale`/`rotate`) automatically, but leaves
+`opacity`, `backgroundColor`, and `width` animations to run on their normal
+timing — confirmed empirically (a page transition's opacity fade still took
+~275ms under `prefers-reduced-motion: reduce` with a fresh Playwright
+`reducedMotion: "reduce"` context, even though its transform was correctly
+frozen). Every component with a non-transform property in its transition
+(`FlyItem`, `PageTransition`'s stagger timing, the league row's opacity and
+its gold flash's `backgroundColor`, the verified-chip stamp's opacity,
+`StreakHero`'s entrance and idle halo) reads `useReducedMotion()` to zero out
+just that transition's duration — never to change what gets rendered, only how
+long the change takes, which is what keeps this consistent with the no-tree-
+branching rule below. `PullToRefresh` goes further and disables the gesture
+outright under reduced motion, since the whole feature is spectacle with no
+functional purpose — there's nothing to make "calm," so it goes inert instead.
+
+Two structural notes carried over from the previous pass, still true:
 
 - The nav and tab bars live in the layout, **outside** the page transition. A
   `position: fixed` element inside a transformed ancestor resolves against that
   ancestor instead of the viewport, which would tear the chrome off the screen
   edges on every navigation. There is a test for this.
-- No component branches on `useReducedMotion()` in a way that changes its tree.
-  The hook returns `null` during static prerender, so a branch renders one tree
-  on the server and another on the client — a hydration mismatch. A single
-  `MotionConfig reducedMotion="user"` handles it instead, which also matches
-  HIG's guidance to *replace* x/y transitions with fades rather than delete
-  them.
+- No component branches on `useReducedMotion()` in a way that changes its
+  tree. The hook returns `null` during static prerender, so a structural
+  branch would render one tree on the server and another on the client — a
+  hydration mismatch this app hit once already. Every reduced-motion check
+  added this pass branches a transition's timing value, never the JSX.
 
 ### Accessibility is enforced, not asserted
 
-`npm run contrast` composites every translucent surface over what is actually
-behind it — ground and glow — before measuring, so "AA against its real
-backdrop" is a check rather than a claim. Every layer of the colour model is
-covered: all three prism stops against the tab pill's real backdrop, fire's
-mid stop against the white ember icon it sits under, gold on ink *and* on
-paper in both themes (a single hex can't clear both when "paper" is white in
-one theme and near-black in the other), and all 5 document hues against a
-white card, a dark card, *and* the ink hero at once.
+`npm run contrast` measures dark label text against every stop of every
+gradient — prism, fire, gold, and all 5 document hues — plus the glass tab
+bar's composited backdrop, the active pill against all three prism stops, and
+the heatmap ramp's step-to-step distinguishability. It also guards against
+itself: every token value it measures is duplicated from `globals.css` and
+`docColor.ts`, so a failed edit that leaves the test asserting a colour the
+app no longer uses fails as `DRIFT` rather than passing while proving nothing.
 
-It also guards against itself: the token values it measures are duplicated from
-`globals.css`, so every one is verified to literally appear in the stylesheet
-first. A failed edit that leaves the test asserting a colour the app no longer
-uses fails as `DRIFT` rather than passing while proving nothing.
-
-`prefers-reduced-transparency` drops the blur and the glow for solid fills;
-`prefers-reduced-motion` makes everything instant and stops the ember;
-`prefers-contrast: more` tightens the palette (including gold's on-paper text,
-which gets its own darker/lighter override per theme); and an `@supports`
-guard covers browsers without `backdrop-filter`. Every interactive target is
-at least 44pt.
+`prefers-reduced-transparency` drops the tab bar's blur for a solid fill;
+`prefers-contrast: more` tightens the palette; an `@supports` guard covers
+browsers without `backdrop-filter`. Every interactive target is at least 44pt
+— checked by a Playwright sweep, not just eyeballed.
 
 ## PWA
 

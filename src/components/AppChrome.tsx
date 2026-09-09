@@ -50,8 +50,7 @@ export function AppChrome() {
   }, [path]);
 
   return (
-    <header className="navbar glass" data-stuck={stuck}>
-      <span className="glass-lens" aria-hidden="true" />
+    <header className="navbar" data-stuck={stuck}>
       <div className="navbar__inner">
         {back ? (
           <Link href={back.href} className="navbar__back">
