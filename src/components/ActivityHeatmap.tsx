@@ -2,7 +2,11 @@ import { DAILY } from "@/lib/fixtures";
 import { durationSpoken, monthLabel, shortDate } from "@/lib/format";
 
 /**
- * All-time activity, one cell per day, columns are weeks.
+ * All-time activity, one cell per day, columns are weeks. Profile's hero.
+ *
+ * Rendered on ink, which is what lets the ramp run all the way up to full
+ * brand orange - the same ramp then works in both themes, because its backdrop
+ * no longer changes with the colour scheme.
  *
  * Levels are bucketed against fixed minute thresholds, not quantiles, so the
  * scale means the same thing in every week. Empty days also carry an inset
@@ -65,6 +69,7 @@ export function ActivityHeatmap() {
                 key={c.date}
                 className="heat__cell"
                 data-level={level(c.scoredMinutes)}
+                style={{ "--d": `${Math.floor(i / 7) * 11}ms` } as React.CSSProperties}
                 title={`${shortDate(c.date)} - ${c.scoredMinutes ? durationSpoken(c.scoredMinutes) : "nothing"}`}
               />
             ) : (
@@ -75,15 +80,15 @@ export function ActivityHeatmap() {
       </div>
 
       <div className="spread" style={{ marginTop: 12 }}>
-        <span className="t-caption2 dimmer">
+        <span className="t-caption2" style={{ color: "rgba(255,236,220,0.6)" }}>
           {shortDate(DAILY[0].date)} &ndash; {shortDate(DAILY[DAILY.length - 1].date)}
         </span>
         <div className="heat-legend">
-          <span className="t-caption2 dimmer">Less</span>
+          <span className="t-caption2" style={{ color: "rgba(255,236,220,0.6)" }}>Less</span>
           {[0, 1, 2, 3, 4].map((l) => (
             <span key={l} className="heat__cell" data-level={l} aria-hidden="true" />
           ))}
-          <span className="t-caption2 dimmer">More</span>
+          <span className="t-caption2" style={{ color: "rgba(255,236,220,0.6)" }}>More</span>
         </div>
       </div>
     </div>

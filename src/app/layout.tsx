@@ -1,7 +1,10 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { TabBar } from "@/components/TabBar";
+import { AppChrome } from "@/components/AppChrome";
 import { GlassDefs } from "@/components/GlassDefs";
+import { PageTransition } from "@/components/PageTransition";
+import { MotionProvider } from "@/components/MotionProvider";
 import { ServiceWorker } from "@/components/ServiceWorker";
 
 export const metadata: Metadata = {
@@ -37,8 +40,8 @@ export const viewport: Viewport = {
   // safe-area-inset padding then clears
   viewportFit: "cover",
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#f2f2f7" },
-    { media: "(prefers-color-scheme: dark)", color: "#000000" },
+    { media: "(prefers-color-scheme: light)", color: "#f6f3ef" },
+    { media: "(prefers-color-scheme: dark)", color: "#0c0a08" },
   ],
 };
 
@@ -47,8 +50,19 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en">
       <body>
         <GlassDefs />
-        <div className="app">{children}</div>
-        <TabBar />
+        <MotionProvider>
+          <AppChrome />
+          <div className="app">
+            <PageTransition>{children}</PageTransition>
+          </div>
+        {/* Scroll edges: content dissolves into the mesh before it reaches the
+            chrome, with a progressive blur ramping toward each edge. This is
+            what stops content ghosting through the glass. */}
+        <div className="edge edge-top" aria-hidden="true" />
+        <div className="edge edge-bottom" aria-hidden="true" />
+        <div className="glow-bottom" aria-hidden="true" />
+          <TabBar />
+        </MotionProvider>
         <ServiceWorker />
       </body>
     </html>

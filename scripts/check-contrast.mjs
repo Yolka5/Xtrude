@@ -9,6 +9,8 @@
  * whatever ground is behind it. This composites first, then measures.
  */
 
+import { readFileSync } from "node:fs";
+
 const hex = (h) => {
   const s = h.replace("#", "");
   const n = s.length === 3 ? s.split("").map((c) => c + c).join("") : s;
@@ -43,36 +45,80 @@ const ratio = (a, b) => {
 };
 
 const L = {
-  ground: "#f2f2f7", surface: "#ffffff", surface2: "#f5f5f8", surface3: "#ebebf0",
-  label: "#1c1c1e", label2: "#55555c", label3: "#6b6b73",
-  accent: "#007aff", accentText: "#0062cc",
-  pos: "#17803d", neg: "#c0271f",
-  glassTint: "rgba(255,255,255,0.80)", chromeSolid: "#fbfbfd",
-  ramp0: "#e9e9ef",
-  ramp1: "rgba(0,122,255,0.42)", ramp2: "rgba(0,122,255,0.62)",
-  ramp3: "rgba(0,122,255,0.80)", ramp4: "rgba(0,122,255,0.97)",
+  ground: "#f6f3ef", surface: "#ffffff", surface2: "#f4f0eb", surface3: "#e9e3db",
+  label: "#1c1712", label2: "#574f47", label3: "#5f574e",
+  accentGraphic: "#e35a00", accentText: "#a03e00",
+  pos: "#15703f", neg: "#a8322a",
+  glassTint: "rgba(255,252,248,0.72)", chromeSolid: "#fdfaf6",
+  mesh: "rgba(255,107,0,0.26)", glow: "rgba(255,107,0,0.42)",
+  barTop: "#f26100", barBottom: "#cc4e00",
+  discTop: "#e35a00", discBottom: "#b84600",
 };
 const D = {
-  ground: "#000000", surface: "#1c1c1e", surface2: "#2c2c2e", surface3: "#3a3a3c",
-  label: "#ffffff", label2: "#b4b4bc", label3: "#95959e",
-  accent: "#0a84ff", accentText: "#6cb8ff",
-  pos: "#5bd98a", neg: "#ff7a70",
-  glassTint: "rgba(28,28,32,0.76)", chromeSolid: "#1a1a1e",
-  ramp0: "#2a2a2e",
-  ramp1: "rgba(10,132,255,0.40)", ramp2: "rgba(10,132,255,0.60)",
-  ramp3: "rgba(10,132,255,0.80)", ramp4: "rgba(10,132,255,1)",
+  ground: "#0c0a08", surface: "#1a1612", surface2: "#241f19", surface3: "#322a22",
+  label: "#fdfbf9", label2: "#b9ada0", label3: "#a99d90",
+  accentGraphic: "#ff7a1f", accentText: "#ff9e57",
+  pos: "#4fd786", neg: "#ff8f85",
+  glassTint: "rgba(30,24,18,0.62)", chromeSolid: "#1b1611",
+  mesh: "rgba(255,107,0,0.30)", glow: "rgba(255,107,0,0.38)",
+  barTop: "#ff8c3d", barBottom: "#ff6b00",
+  discTop: "#e35a00", discBottom: "#b84600",
 };
 
-/* Worst case for glass chrome: the ground wash is at its most saturated where
-   the radial gradients peak, so composite the wash over the ground first, then
-   the glass tint over that. */
-const washL = over("rgba(0,122,255,0.10)", L.ground);
-const washD = over("rgba(10,132,255,0.16)", D.ground);
+/* The ink hero and its activity ramp are the same in both themes, except that
+   dark mode raises the hero surface so it lifts off a near-black ground. */
+const INK = { light: "#17120d", dark: "#241b13" };
+const HEAT = ["#2a231b", "#6b3a10", "#a8570c", "#e0700a", "#ff8f2e"];
+const ON_INK = {
+  label: "#ffffff",
+  label2: "rgba(255,236,220,0.78)",
+  label3: "rgba(255,236,220,0.60)",
+  brand: "#ff6b00",
+  unit: "#ffb87f",
+  pos: "#6ee7a0",
+  neg: "#ff9d94",
+};
+
+/* Worst case for the chrome: the mesh is at its most saturated directly under
+   the floating tab bar, which is exactly where the tab labels sit. Composite
+   the mesh over the ground, then the glass tint over that, and measure the
+   labels against THAT - not against an idealised flat background. */
+// The tab bar's true backdrop is the ground, plus the mesh, plus the warm glow
+// re-laid over the scroll-edge fade. All three, then the tint.
+const washL = over(L.glow, over(L.mesh, L.ground));
+const washD = over(D.glow, over(D.mesh, D.ground));
 const glassL = over(L.glassTint, washL);
 const glassD = over(D.glassTint, washD);
 
 const AA = 4.5, AA_LARGE = 3.0, GRAPHIC = 3.0;
 let fails = 0;
+
+/* --------------------------------------------------------------------------
+   Guard against the table above drifting away from the stylesheet.
+
+   These values are duplicated from globals.css, which means a failed edit can
+   leave this file asserting a colour the app does not actually use - a test
+   that passes while proving nothing. Every value is therefore checked for its
+   literal presence in the stylesheet before any contrast is measured.
+   -------------------------------------------------------------------------- */
+const css = readFileSync(new URL("../src/app/globals.css", import.meta.url), "utf8");
+const norm = (v) => v.replace(/\s+/g, "").toLowerCase();
+const cssTokens = norm(css);
+
+function assertInCss(label, value) {
+  if (!cssTokens.includes(norm(value))) {
+    console.log(`DRIFT  ${label} = ${value} does not appear in globals.css`);
+    fails++;
+  }
+}
+for (const [mode, T] of [["light", L], ["dark", D]]) {
+  for (const [k, v] of Object.entries(T)) {
+    if (typeof v === "string") assertInCss(`${mode}.${k}`, v);
+  }
+}
+for (const [k, v] of Object.entries(INK)) assertInCss(`ink.${k}`, v);
+HEAT.forEach((v, i) => assertInCss(`heat-${i}`, v));
+if (fails) console.log("");
 
 const check = (name, fg, bg, min) => {
   const r = ratio(fg, bg);
@@ -89,16 +135,23 @@ const check = (name, fg, bg, min) => {
 
 for (const [mode, T, glass] of [["LIGHT", L, glassL], ["DARK", D, glassD]]) {
   console.log(`\n=== ${mode} ===`);
+  const ink = mode === "LIGHT" ? INK.light : INK.dark;
   console.log("-- text on solid content surfaces (the numbers) --");
   check("label on card",              T.label,  T.surface,  AA);
   check("label-2 on card",            T.label2, T.surface,  AA);
   check("label-3 on card",            T.label3, T.surface,  AA);
   check("label-2 on ground",          T.label2, T.ground,   AA);
   check("label-3 on ground",          T.label3, T.ground,   AA);
+  // Section headings and subtitles sit on the bare ground, which the mesh
+  // tints. Measure them where the mesh is strongest, not on flat paint.
+  check("label-2 on ground+mesh",     T.label2, over(T.mesh, T.ground), AA);
+  check("label-3 on ground+mesh",     T.label3, over(T.mesh, T.ground), AA);
+  check("accent-text on ground+mesh", T.accentText, over(T.mesh, T.ground), AA);
   check("label-2 on surface-2",       T.label2, T.surface2, AA);
   check("label-3 on surface-2",       T.label3, T.surface2, AA);
-  check("accent-text on card",        T.accentText, T.surface, AA);
-  check("accent-text on ground",      T.accentText, T.ground,  AA);
+  check("accent-text on card",        T.accentText, T.surface,  AA);
+  check("accent-text on ground",      T.accentText, T.ground,   AA);
+  check("accent-text on surface-2",   T.accentText, T.surface2, AA);
   check("positive on card",           T.pos,    T.surface,  AA);
   check("negative on card",           T.neg,    T.surface,  AA);
 
@@ -112,20 +165,34 @@ for (const [mode, T, glass] of [["LIGHT", L, glassL], ["DARK", D, glassD]]) {
   check("label-3 on chrome-solid",    T.label3,     T.chromeSolid, AA);
   check("accent-text on chrome-solid",T.accentText, T.chromeSolid, AA);
 
-  console.log("-- graphic objects (chart marks, 3:1) --");
-  check("accent fill on card",        T.accent, T.surface, GRAPHIC);
-  check("accent fill on ground",      T.accent, T.ground,  GRAPHIC);
-  check("ramp-0 empty cell on card",  T.ramp0,  T.surface, 1.05);
-  // The lightest activity step must be clearly heavier than "no activity",
-  // otherwise a day with work reads as emptier than a day without.
-  const r1 = over(T.ramp1, T.surface);
-  const r2 = over(T.ramp2, T.surface);
-  const r3 = over(T.ramp3, T.surface);
-  const r4 = over(T.ramp4, T.surface);
-  check("ramp-1 vs ramp-0 (empty)",   r1, T.ramp0, 1.35);
-  check("ramp-2 vs ramp-1",           r2, r1, 1.2);
-  check("ramp-3 vs ramp-2",           r3, r2, 1.2);
-  check("ramp-4 vs ramp-3",           r4, r3, 1.15);
+  console.log("-- text on the INK hero (where the brand orange is legible) --");
+  check("white on ink",               ON_INK.label,  ink, AA);
+  check("hero secondary on ink",      ON_INK.label2, ink, AA);
+  check("hero tertiary on ink",       ON_INK.label3, ink, AA);
+  check("BRAND #ff6b00 on ink",       ON_INK.brand,  ink, AA);
+  check("hero unit on ink",           ON_INK.unit,   ink, AA);
+  check("hero positive on ink",       ON_INK.pos,    ink, AA);
+  check("hero negative on ink",       ON_INK.neg,    ink, AA);
+
+  console.log("-- graphic objects (3:1) --");
+  // A gradient bar has to clear the bar at BOTH ends, not just where it is
+  // darkest - the light end is the one that fails on white.
+  check("bar gradient top on card",   T.barTop,    T.surface, GRAPHIC);
+  check("bar gradient base on card",  T.barBottom, T.surface, GRAPHIC);
+  check("accent graphic on card",     T.accentGraphic, T.surface, GRAPHIC);
+  // White glyphs and initials ride on these gradients, so the lightest stop
+  // of the disc has to clear the bar too.
+  check("white glyph on disc (light end)", "#ffffff", T.discTop,    GRAPHIC);
+  check("white glyph on disc (dark end)",  "#ffffff", T.discBottom, GRAPHIC);
+
+  console.log("-- activity ramp, on ink in both themes --");
+  check("empty cell vs ink",          HEAT[0], ink, 1.05);
+  // The lightest step must be clearly heavier than "no activity", or a day
+  // with work reads as emptier than a day without.
+  check("step 1 vs empty",            HEAT[1], HEAT[0], 1.35);
+  check("step 2 vs step 1",           HEAT[2], HEAT[1], 1.2);
+  check("step 3 vs step 2",           HEAT[3], HEAT[2], 1.2);
+  check("step 4 vs step 3",           HEAT[4], HEAT[3], 1.15);
 }
 
 console.log(fails === 0 ? "\nAll checks pass.\n" : `\n${fails} FAILING.\n`);

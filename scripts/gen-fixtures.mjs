@@ -83,6 +83,20 @@ const DOCS = [
 const days = [];
 let seq = 0;
 
+/* Document choice is streaky, not uniform. Engineering work has a focus: you
+ * live in one part for several days, then move to the next one. Drawing each
+ * session's document independently produced runs where a single document
+ * happened to dominate a whole month by accident, which is both less realistic
+ * and reads as a bug. This models the focus explicitly instead. */
+let focus = pick(DOCS);
+let focusDaysLeft = int(3, 8);
+const FOCUS_SHARE = 0.62;
+
+function chooseDoc() {
+  if (rnd() < FOCUS_SHARE) return focus;
+  return pick(DOCS.filter((d) => d.name !== focus.name));
+}
+
 for (let back = HISTORY_DAYS - 1; back >= 0; back--) {
   const ms = todayMs - back * DAY_MS;
   const date = iso(ms);
@@ -99,6 +113,12 @@ for (let back = HISTORY_DAYS - 1; back >= 0; back--) {
   const active = inCurrentStreak || inSeededStreak || rnd() < pActive;
 
   if (!active) { days.push({ date, sessions: [] }); continue; }
+
+  // A worked day advances the focus clock; the focus rotates when it expires.
+  if (--focusDaysLeft <= 0) {
+    focus = pick(DOCS.filter((d) => d.name !== focus.name));
+    focusDaysLeft = int(3, 8);
+  }
 
   // Several short bursts per day, not one block.
   const roll = rnd();
@@ -121,7 +141,7 @@ for (let back = HISTORY_DAYS - 1; back >= 0; back--) {
     // renames, drawing tweaks, or metadata edits and score nothing.
     const verified = rnd() < 0.82;
 
-    const doc = pick(DOCS);
+    const doc = chooseDoc();
     const documents = [{ name: doc.name, tab: pick(doc.tabs), edits: events }];
     if (rnd() < 0.22) {
       const other = pick(DOCS.filter((d) => d.name !== doc.name));
@@ -262,6 +282,40 @@ const badges = [
   { id: "b12", name: "Century",        detail: "100 hours modeled",              glyph: "crown",     earned: false, earnedOn: null },
 ];
 
+// --- consistency ------------------------------------------------------------
+/* Badges make factual claims about this data. Regenerating shifts every number,
+ * so those claims are asserted rather than trusted - an earlier run shipped a
+ * "100 hours modeled" badge marked earned against a 45-hour history. */
+const verifiedCount = allSessions.filter((s) => s.verified).length;
+const maxScored = Math.max(...allSessions.map((s) => s.scoredMinutes));
+const lifetimeHours = lifetimeMinutes / 60;
+
+const CLAIMS = {
+  b1:  () => allSessions.length > 0,
+  b2:  () => longestStreak >= 7,
+  b3:  () => longestStreak >= 14,
+  b4:  () => maxScored > 20,
+  b5:  () => verifiedCount >= 100,
+  b6:  () => lifetimeHours >= 50,
+  b7:  () => longestStreak >= 30,
+  b8:  () => maxScored > 120,
+  b10: () => DOCS.length >= 10,
+  b11: () => allSessions.filter((s) => Number(s.start.slice(0, 2)) < 8).length >= 20,
+  b12: () => lifetimeHours >= 100,
+};
+
+const contradictions = badges
+  .filter((b) => CLAIMS[b.id] && CLAIMS[b.id]() !== b.earned)
+  .map((b) => `  ${b.id} "${b.name}" (${b.detail}) is marked ${b.earned ? "earned" : "locked"} but the data says otherwise`);
+
+if (contradictions.length) {
+  console.error("Badge claims contradict the generated data:");
+  console.error(contradictions.join("\n"));
+  console.error(`\n  lifetime ${lifetimeHours.toFixed(1)}h, longest streak ${longestStreak}d, ` +
+    `longest session ${maxScored}m, verified ${verifiedCount}`);
+  process.exit(1);
+}
+
 // --- emit -------------------------------------------------------------------
 const j = (v) => JSON.stringify(v, null, 2);
 
@@ -362,6 +416,35 @@ export type PersonalRecord = {
   when: string;
 };
 
+export type TodayStats = { scoredMinutes: number; sessions: number; events: number };
+
+export type StreakStats = {
+  current: number;
+  longest: number;
+  /** Monday-to-today, this week. */
+  weekMinutes: number;
+  /** Days of this week counted so far, for like-for-like pace comparisons. */
+  weekDaysElapsed: number;
+  /** The equivalent full Monday-Sunday total for last week. */
+  lastWeekMinutes: number;
+};
+
+export type ProfileStats = {
+  name: string;
+  handle: string;
+  initials: string;
+  memberSince: string;
+  lifetimeMinutes: number;
+  lifetimeHours: number;
+  totalSessions: number;
+  activeDays: number;
+  longestStreak: number;
+  currentStreak: number;
+  medianSessionMinutes: number;
+  /** Percentage of sessions where geometry actually changed. */
+  verifiedShare: number;
+};
+
 export type Badge = {
   id: string;
   name: string;
@@ -379,21 +462,21 @@ export const DAILY: DayTotal[] = ${j(daily)};
 
 export const WEEK: WeekDay[] = ${j(week)};
 
-export const TODAY_STATS = ${j({
+export const TODAY_STATS: TodayStats = ${j({
   scoredMinutes: todayEntry.scoredMinutes,
   sessions: todayEntry.sessions,
   events: allSessions.filter((s) => s.date === TODAY).reduce((a, s) => a + s.eventCount, 0),
-})} as const;
+})};
 
-export const STREAK = ${j({
+export const STREAK: StreakStats = ${j({
   current: currentStreak,
   longest: longestStreak,
   weekMinutes: week.reduce((a, d) => a + d.scoredMinutes, 0),
   weekDaysElapsed: mondayOffset + 1,
   lastWeekMinutes,
-})} as const;
+})};
 
-export const PROFILE = ${j({
+export const PROFILE: ProfileStats = ${j({
   name: "You",
   handle: "@yoni",
   initials: "YS",
@@ -406,7 +489,7 @@ export const PROFILE = ${j({
   currentStreak,
   medianSessionMinutes: medianSession,
   verifiedShare: Math.round((allSessions.filter((s) => s.verified).length / allSessions.length) * 100),
-})} as const;
+})};
 
 export const RECORDS: PersonalRecord[] = ${j([
   { label: "Longest session", value: longestSession.scoredMinutes, unit: "min", when: longestSession.date },
@@ -433,3 +516,4 @@ console.log(`  sessions/active day: ${(allSessions.length / activeDays).toFixed(
 console.log(`  today              : ${todayEntry.scoredMinutes} min over ${todayEntry.sessions} sessions`);
 console.log(`  current streak     : ${currentStreak}  longest: ${longestStreak}`);
 console.log(`  lifetime           : ${(lifetimeMinutes / 60).toFixed(1)} h over ${activeDays} active days`);
+console.log(`  badge claims       : all ${Object.keys(CLAIMS).length} checked against the data`);

@@ -8,7 +8,7 @@
  *
  * The distribution is modelled on what phase0_validate.py measured against real
  * Onshape microversion history: short bursts, several a day, median around
- * 11 minutes of credited time.
+ * 12 minutes of credited time.
  */
 
 /** The scoring parameters this data was generated under, mirrored from phase0_validate.py. */
@@ -95,6 +95,35 @@ export type PersonalRecord = {
   when: string;
 };
 
+export type TodayStats = { scoredMinutes: number; sessions: number; events: number };
+
+export type StreakStats = {
+  current: number;
+  longest: number;
+  /** Monday-to-today, this week. */
+  weekMinutes: number;
+  /** Days of this week counted so far, for like-for-like pace comparisons. */
+  weekDaysElapsed: number;
+  /** The equivalent full Monday-Sunday total for last week. */
+  lastWeekMinutes: number;
+};
+
+export type ProfileStats = {
+  name: string;
+  handle: string;
+  initials: string;
+  memberSince: string;
+  lifetimeMinutes: number;
+  lifetimeHours: number;
+  totalSessions: number;
+  activeDays: number;
+  longestStreak: number;
+  currentStreak: number;
+  medianSessionMinutes: number;
+  /** Percentage of sessions where geometry actually changed. */
+  verifiedShare: number;
+};
+
 export type Badge = {
   id: string;
   name: string;
@@ -107,28 +136,46 @@ export type Badge = {
 /** Full session records for the last 21 days, newest first. */
 export const SESSIONS: Session[] = [
   {
-    "id": "s0276",
+    "id": "s0284",
     "date": "2026-09-09",
-    "start": "13:57",
-    "end": "14:13",
-    "rawMinutes": 16,
-    "scoredMinutes": 21,
+    "start": "15:06",
+    "end": "15:09",
+    "rawMinutes": 3,
+    "scoredMinutes": 8,
     "leadInMinutes": 5,
-    "eventCount": 22,
+    "eventCount": 5,
     "verified": true,
     "documents": [
       {
         "name": "Bearing Block",
-        "tab": "Assembly",
-        "edits": 22
+        "tab": "Cap",
+        "edits": 5
       }
     ]
   },
   {
-    "id": "s0275",
+    "id": "s0283",
     "date": "2026-09-09",
-    "start": "11:03",
-    "end": "11:04",
+    "start": "12:14",
+    "end": "12:16",
+    "rawMinutes": 2,
+    "scoredMinutes": 7,
+    "leadInMinutes": 5,
+    "eventCount": 5,
+    "verified": false,
+    "documents": [
+      {
+        "name": "Rover Chassis",
+        "tab": "Frame",
+        "edits": 5
+      }
+    ]
+  },
+  {
+    "id": "s0282",
+    "date": "2026-09-08",
+    "start": "11:57",
+    "end": "11:58",
     "rawMinutes": 1,
     "scoredMinutes": 6,
     "leadInMinutes": 5,
@@ -136,17 +183,58 @@ export const SESSIONS: Session[] = [
     "verified": true,
     "documents": [
       {
-        "name": "Rover Chassis",
-        "tab": "Skid Plate",
+        "name": "Bearing Block",
+        "tab": "Assembly",
         "edits": 3
       }
     ]
   },
   {
-    "id": "s0274",
+    "id": "s0281",
     "date": "2026-09-08",
-    "start": "12:21",
-    "end": "12:24",
+    "start": "10:19",
+    "end": "10:35",
+    "rawMinutes": 16,
+    "scoredMinutes": 21,
+    "leadInMinutes": 5,
+    "eventCount": 19,
+    "verified": false,
+    "documents": [
+      {
+        "name": "Bearing Block",
+        "tab": "Block",
+        "edits": 13
+      },
+      {
+        "name": "Rover Chassis",
+        "tab": "Frame",
+        "edits": 6
+      }
+    ]
+  },
+  {
+    "id": "s0280",
+    "date": "2026-09-07",
+    "start": "16:52",
+    "end": "17:11",
+    "rawMinutes": 19,
+    "scoredMinutes": 24,
+    "leadInMinutes": 5,
+    "eventCount": 20,
+    "verified": true,
+    "documents": [
+      {
+        "name": "Camera Mount Rev B",
+        "tab": "Assembly",
+        "edits": 20
+      }
+    ]
+  },
+  {
+    "id": "s0279",
+    "date": "2026-09-07",
+    "start": "14:38",
+    "end": "14:41",
     "rawMinutes": 3,
     "scoredMinutes": 8,
     "leadInMinutes": 5,
@@ -155,44 +243,157 @@ export const SESSIONS: Session[] = [
     "documents": [
       {
         "name": "Bearing Block",
-        "tab": "Assembly",
+        "tab": "Block",
         "edits": 6
       }
     ]
   },
   {
-    "id": "s0273",
-    "date": "2026-09-08",
-    "start": "09:44",
-    "end": "09:59",
-    "rawMinutes": 15,
-    "scoredMinutes": 20,
+    "id": "s0278",
+    "date": "2026-09-07",
+    "start": "12:06",
+    "end": "12:17",
+    "rawMinutes": 11,
+    "scoredMinutes": 16,
     "leadInMinutes": 5,
-    "eventCount": 17,
+    "eventCount": 18,
+    "verified": true,
+    "documents": [
+      {
+        "name": "M5 Standoff Kit",
+        "tab": "Drawing",
+        "edits": 18
+      }
+    ]
+  },
+  {
+    "id": "s0277",
+    "date": "2026-09-06",
+    "start": "09:19",
+    "end": "09:25",
+    "rawMinutes": 6,
+    "scoredMinutes": 11,
+    "leadInMinutes": 5,
+    "eventCount": 9,
+    "verified": true,
+    "documents": [
+      {
+        "name": "Drivetrain Gearbox",
+        "tab": "Gear Train",
+        "edits": 9
+      }
+    ]
+  },
+  {
+    "id": "s0276",
+    "date": "2026-09-05",
+    "start": "15:04",
+    "end": "15:24",
+    "rawMinutes": 20,
+    "scoredMinutes": 25,
+    "leadInMinutes": 5,
+    "eventCount": 25,
+    "verified": true,
+    "documents": [
+      {
+        "name": "Drivetrain Gearbox",
+        "tab": "Output Shaft",
+        "edits": 17
+      },
+      {
+        "name": "Bearing Block",
+        "tab": "Block",
+        "edits": 8
+      }
+    ]
+  },
+  {
+    "id": "s0275",
+    "date": "2026-09-05",
+    "start": "12:15",
+    "end": "12:18",
+    "rawMinutes": 3,
+    "scoredMinutes": 8,
+    "leadInMinutes": 5,
+    "eventCount": 5,
+    "verified": false,
+    "documents": [
+      {
+        "name": "Drivetrain Gearbox",
+        "tab": "Gear Train",
+        "edits": 5
+      }
+    ]
+  },
+  {
+    "id": "s0274",
+    "date": "2026-09-05",
+    "start": "09:20",
+    "end": "09:29",
+    "rawMinutes": 9,
+    "scoredMinutes": 14,
+    "leadInMinutes": 5,
+    "eventCount": 10,
+    "verified": true,
+    "documents": [
+      {
+        "name": "Drivetrain Gearbox",
+        "tab": "Housing",
+        "edits": 7
+      },
+      {
+        "name": "Camera Mount Rev B",
+        "tab": "Ball Joint",
+        "edits": 3
+      }
+    ]
+  },
+  {
+    "id": "s0273",
+    "date": "2026-09-04",
+    "start": "13:32",
+    "end": "13:35",
+    "rawMinutes": 3,
+    "scoredMinutes": 8,
+    "leadInMinutes": 5,
+    "eventCount": 5,
     "verified": true,
     "documents": [
       {
         "name": "Bearing Block",
         "tab": "Assembly",
-        "edits": 12
-      },
-      {
-        "name": "Enclosure v4",
-        "tab": "Lid",
         "edits": 5
       }
     ]
   },
   {
     "id": "s0272",
-    "date": "2026-09-07",
-    "start": "11:24",
-    "end": "11:26",
-    "rawMinutes": 2,
-    "scoredMinutes": 7,
+    "date": "2026-09-04",
+    "start": "12:08",
+    "end": "12:12",
+    "rawMinutes": 4,
+    "scoredMinutes": 9,
+    "leadInMinutes": 5,
+    "eventCount": 8,
+    "verified": true,
+    "documents": [
+      {
+        "name": "Camera Mount Rev B",
+        "tab": "Assembly",
+        "edits": 8
+      }
+    ]
+  },
+  {
+    "id": "s0271",
+    "date": "2026-09-04",
+    "start": "11:14",
+    "end": "11:15",
+    "rawMinutes": 1,
+    "scoredMinutes": 6,
     "leadInMinutes": 5,
     "eventCount": 3,
-    "verified": true,
+    "verified": false,
     "documents": [
       {
         "name": "Bearing Block",
@@ -202,177 +403,10 @@ export const SESSIONS: Session[] = [
     ]
   },
   {
-    "id": "s0271",
-    "date": "2026-09-07",
-    "start": "10:19",
-    "end": "10:34",
-    "rawMinutes": 15,
-    "scoredMinutes": 20,
-    "leadInMinutes": 5,
-    "eventCount": 13,
-    "verified": false,
-    "documents": [
-      {
-        "name": "Camera Mount Rev B",
-        "tab": "Assembly",
-        "edits": 13
-      }
-    ]
-  },
-  {
     "id": "s0270",
-    "date": "2026-09-06",
-    "start": "13:43",
-    "end": "13:52",
-    "rawMinutes": 9,
-    "scoredMinutes": 14,
-    "leadInMinutes": 5,
-    "eventCount": 8,
-    "verified": true,
-    "documents": [
-      {
-        "name": "Bearing Block",
-        "tab": "Assembly",
-        "edits": 8
-      }
-    ]
-  },
-  {
-    "id": "s0269",
-    "date": "2026-09-06",
-    "start": "12:58",
-    "end": "13:11",
-    "rawMinutes": 13,
-    "scoredMinutes": 18,
-    "leadInMinutes": 5,
-    "eventCount": 16,
-    "verified": true,
-    "documents": [
-      {
-        "name": "Bearing Block",
-        "tab": "Assembly",
-        "edits": 11
-      },
-      {
-        "name": "Enclosure v4",
-        "tab": "Shell",
-        "edits": 5
-      }
-    ]
-  },
-  {
-    "id": "s0268",
-    "date": "2026-09-06",
-    "start": "10:51",
-    "end": "10:53",
-    "rawMinutes": 2,
-    "scoredMinutes": 7,
-    "leadInMinutes": 5,
-    "eventCount": 5,
-    "verified": true,
-    "documents": [
-      {
-        "name": "Rover Chassis",
-        "tab": "Skid Plate",
-        "edits": 5
-      }
-    ]
-  },
-  {
-    "id": "s0267",
-    "date": "2026-09-06",
-    "start": "10:14",
-    "end": "10:16",
-    "rawMinutes": 2,
-    "scoredMinutes": 7,
-    "leadInMinutes": 5,
-    "eventCount": 5,
-    "verified": true,
-    "documents": [
-      {
-        "name": "Rover Chassis",
-        "tab": "Skid Plate",
-        "edits": 5
-      }
-    ]
-  },
-  {
-    "id": "s0266",
-    "date": "2026-09-05",
-    "start": "11:18",
-    "end": "11:37",
-    "rawMinutes": 19,
-    "scoredMinutes": 24,
-    "leadInMinutes": 5,
-    "eventCount": 23,
-    "verified": true,
-    "documents": [
-      {
-        "name": "Camera Mount Rev B",
-        "tab": "Ball Joint",
-        "edits": 23
-      }
-    ]
-  },
-  {
-    "id": "s0265",
-    "date": "2026-09-05",
-    "start": "09:22",
-    "end": "09:26",
-    "rawMinutes": 4,
-    "scoredMinutes": 9,
-    "leadInMinutes": 5,
-    "eventCount": 6,
-    "verified": true,
-    "documents": [
-      {
-        "name": "Rover Chassis",
-        "tab": "Frame",
-        "edits": 6
-      }
-    ]
-  },
-  {
-    "id": "s0264",
-    "date": "2026-09-04",
-    "start": "18:31",
-    "end": "18:48",
-    "rawMinutes": 17,
-    "scoredMinutes": 22,
-    "leadInMinutes": 5,
-    "eventCount": 20,
-    "verified": false,
-    "documents": [
-      {
-        "name": "M5 Standoff Kit",
-        "tab": "Standoff",
-        "edits": 20
-      }
-    ]
-  },
-  {
-    "id": "s0263",
-    "date": "2026-09-04",
-    "start": "15:36",
-    "end": "15:51",
-    "rawMinutes": 15,
-    "scoredMinutes": 20,
-    "leadInMinutes": 5,
-    "eventCount": 21,
-    "verified": true,
-    "documents": [
-      {
-        "name": "Camera Mount Rev B",
-        "tab": "Ball Joint",
-        "edits": 21
-      }
-    ]
-  },
-  {
-    "id": "s0262",
-    "date": "2026-09-04",
-    "start": "13:27",
-    "end": "13:28",
+    "date": "2026-09-03",
+    "start": "13:02",
+    "end": "13:03",
     "rawMinutes": 1,
     "scoredMinutes": 6,
     "leadInMinutes": 5,
@@ -381,147 +415,52 @@ export const SESSIONS: Session[] = [
     "documents": [
       {
         "name": "Drivetrain Gearbox",
-        "tab": "Gear Train",
+        "tab": "Housing",
         "edits": 3
       }
     ]
   },
   {
-    "id": "s0261",
-    "date": "2026-09-04",
-    "start": "12:27",
-    "end": "12:32",
-    "rawMinutes": 5,
-    "scoredMinutes": 10,
+    "id": "s0269",
+    "date": "2026-09-03",
+    "start": "10:42",
+    "end": "10:57",
+    "rawMinutes": 15,
+    "scoredMinutes": 20,
     "leadInMinutes": 5,
-    "eventCount": 9,
+    "eventCount": 21,
     "verified": true,
     "documents": [
       {
-        "name": "M5 Standoff Kit",
-        "tab": "Standoff",
-        "edits": 9
+        "name": "Bearing Block",
+        "tab": "Cap",
+        "edits": 21
       }
     ]
   },
   {
-    "id": "s0260",
-    "date": "2026-09-03",
-    "start": "11:18",
-    "end": "11:25",
-    "rawMinutes": 7,
-    "scoredMinutes": 12,
+    "id": "s0268",
+    "date": "2026-09-02",
+    "start": "10:41",
+    "end": "10:59",
+    "rawMinutes": 18,
+    "scoredMinutes": 23,
     "leadInMinutes": 5,
-    "eventCount": 10,
-    "verified": true,
-    "documents": [
-      {
-        "name": "M5 Standoff Kit",
-        "tab": "Drawing",
-        "edits": 10
-      }
-    ]
-  },
-  {
-    "id": "s0259",
-    "date": "2026-09-03",
-    "start": "10:11",
-    "end": "10:14",
-    "rawMinutes": 3,
-    "scoredMinutes": 8,
-    "leadInMinutes": 5,
-    "eventCount": 6,
+    "eventCount": 19,
     "verified": true,
     "documents": [
       {
         "name": "Camera Mount Rev B",
         "tab": "Ball Joint",
-        "edits": 6
+        "edits": 19
       }
     ]
   },
   {
-    "id": "s0258",
-    "date": "2026-09-02",
-    "start": "12:02",
-    "end": "12:03",
-    "rawMinutes": 1,
-    "scoredMinutes": 6,
-    "leadInMinutes": 5,
-    "eventCount": 3,
-    "verified": true,
-    "documents": [
-      {
-        "name": "Bearing Block",
-        "tab": "Cap",
-        "edits": 3
-      }
-    ]
-  },
-  {
-    "id": "s0257",
-    "date": "2026-09-02",
-    "start": "11:22",
-    "end": "11:24",
-    "rawMinutes": 2,
-    "scoredMinutes": 7,
-    "leadInMinutes": 5,
-    "eventCount": 3,
-    "verified": true,
-    "documents": [
-      {
-        "name": "Enclosure v4",
-        "tab": "Shell",
-        "edits": 2
-      },
-      {
-        "name": "Bearing Block",
-        "tab": "Cap",
-        "edits": 1
-      }
-    ]
-  },
-  {
-    "id": "s0256",
+    "id": "s0267",
     "date": "2026-09-01",
-    "start": "10:36",
-    "end": "10:38",
-    "rawMinutes": 2,
-    "scoredMinutes": 7,
-    "leadInMinutes": 5,
-    "eventCount": 4,
-    "verified": true,
-    "documents": [
-      {
-        "name": "Rover Chassis",
-        "tab": "Frame",
-        "edits": 4
-      }
-    ]
-  },
-  {
-    "id": "s0255",
-    "date": "2026-08-31",
-    "start": "18:34",
-    "end": "18:35",
-    "rawMinutes": 1,
-    "scoredMinutes": 6,
-    "leadInMinutes": 5,
-    "eventCount": 3,
-    "verified": true,
-    "documents": [
-      {
-        "name": "Bearing Block",
-        "tab": "Cap",
-        "edits": 3
-      }
-    ]
-  },
-  {
-    "id": "s0254",
-    "date": "2026-08-31",
-    "start": "17:01",
-    "end": "17:19",
+    "start": "10:18",
+    "end": "10:36",
     "rawMinutes": 18,
     "scoredMinutes": 23,
     "leadInMinutes": 5,
@@ -529,451 +468,345 @@ export const SESSIONS: Session[] = [
     "verified": true,
     "documents": [
       {
+        "name": "Rover Chassis",
+        "tab": "Skid Plate",
+        "edits": 21
+      }
+    ]
+  },
+  {
+    "id": "s0266",
+    "date": "2026-09-01",
+    "start": "09:07",
+    "end": "09:26",
+    "rawMinutes": 19,
+    "scoredMinutes": 24,
+    "leadInMinutes": 5,
+    "eventCount": 24,
+    "verified": true,
+    "documents": [
+      {
+        "name": "Drivetrain Gearbox",
+        "tab": "Output Shaft",
+        "edits": 24
+      }
+    ]
+  },
+  {
+    "id": "s0265",
+    "date": "2026-08-31",
+    "start": "17:50",
+    "end": "17:55",
+    "rawMinutes": 5,
+    "scoredMinutes": 10,
+    "leadInMinutes": 5,
+    "eventCount": 8,
+    "verified": true,
+    "documents": [
+      {
+        "name": "M5 Standoff Kit",
+        "tab": "Standoff",
+        "edits": 8
+      }
+    ]
+  },
+  {
+    "id": "s0264",
+    "date": "2026-08-31",
+    "start": "14:33",
+    "end": "14:43",
+    "rawMinutes": 10,
+    "scoredMinutes": 15,
+    "leadInMinutes": 5,
+    "eventCount": 17,
+    "verified": true,
+    "documents": [
+      {
+        "name": "M5 Standoff Kit",
+        "tab": "Drawing",
+        "edits": 17
+      }
+    ]
+  },
+  {
+    "id": "s0263",
+    "date": "2026-08-31",
+    "start": "11:43",
+    "end": "11:59",
+    "rawMinutes": 16,
+    "scoredMinutes": 21,
+    "leadInMinutes": 5,
+    "eventCount": 25,
+    "verified": true,
+    "documents": [
+      {
+        "name": "Camera Mount Rev B",
+        "tab": "Ball Joint",
+        "edits": 25
+      }
+    ]
+  },
+  {
+    "id": "s0262",
+    "date": "2026-08-30",
+    "start": "09:12",
+    "end": "09:13",
+    "rawMinutes": 1,
+    "scoredMinutes": 6,
+    "leadInMinutes": 5,
+    "eventCount": 3,
+    "verified": true,
+    "documents": [
+      {
+        "name": "Rover Chassis",
+        "tab": "Suspension Mount",
+        "edits": 2
+      },
+      {
+        "name": "Enclosure v4",
+        "tab": "Shell",
+        "edits": 1
+      }
+    ]
+  },
+  {
+    "id": "s0261",
+    "date": "2026-08-29",
+    "start": "09:44",
+    "end": "09:55",
+    "rawMinutes": 11,
+    "scoredMinutes": 16,
+    "leadInMinutes": 5,
+    "eventCount": 10,
+    "verified": true,
+    "documents": [
+      {
+        "name": "Drivetrain Gearbox",
+        "tab": "Output Shaft",
+        "edits": 10
+      }
+    ]
+  },
+  {
+    "id": "s0260",
+    "date": "2026-08-28",
+    "start": "10:09",
+    "end": "10:11",
+    "rawMinutes": 2,
+    "scoredMinutes": 7,
+    "leadInMinutes": 5,
+    "eventCount": 5,
+    "verified": true,
+    "documents": [
+      {
+        "name": "Camera Mount Rev B",
+        "tab": "Bracket",
+        "edits": 5
+      }
+    ]
+  },
+  {
+    "id": "s0259",
+    "date": "2026-08-28",
+    "start": "09:31",
+    "end": "09:32",
+    "rawMinutes": 1,
+    "scoredMinutes": 6,
+    "leadInMinutes": 5,
+    "eventCount": 3,
+    "verified": true,
+    "documents": [
+      {
+        "name": "Rover Chassis",
+        "tab": "Skid Plate",
+        "edits": 2
+      },
+      {
+        "name": "M5 Standoff Kit",
+        "tab": "Standoff",
+        "edits": 1
+      }
+    ]
+  },
+  {
+    "id": "s0258",
+    "date": "2026-08-27",
+    "start": "10:42",
+    "end": "10:59",
+    "rawMinutes": 17,
+    "scoredMinutes": 22,
+    "leadInMinutes": 5,
+    "eventCount": 19,
+    "verified": true,
+    "documents": [
+      {
+        "name": "Camera Mount Rev B",
+        "tab": "Ball Joint",
+        "edits": 13
+      },
+      {
         "name": "Bearing Block",
+        "tab": "Block",
+        "edits": 6
+      }
+    ]
+  },
+  {
+    "id": "s0257",
+    "date": "2026-08-23",
+    "start": "15:04",
+    "end": "15:23",
+    "rawMinutes": 19,
+    "scoredMinutes": 24,
+    "leadInMinutes": 5,
+    "eventCount": 22,
+    "verified": true,
+    "documents": [
+      {
+        "name": "Camera Mount Rev B",
         "tab": "Assembly",
+        "edits": 15
+      },
+      {
+        "name": "Rover Chassis",
+        "tab": "Frame",
+        "edits": 7
+      }
+    ]
+  },
+  {
+    "id": "s0256",
+    "date": "2026-08-23",
+    "start": "12:30",
+    "end": "12:40",
+    "rawMinutes": 10,
+    "scoredMinutes": 15,
+    "leadInMinutes": 5,
+    "eventCount": 15,
+    "verified": false,
+    "documents": [
+      {
+        "name": "Camera Mount Rev B",
+        "tab": "Assembly",
+        "edits": 15
+      }
+    ]
+  },
+  {
+    "id": "s0255",
+    "date": "2026-08-22",
+    "start": "12:52",
+    "end": "13:04",
+    "rawMinutes": 12,
+    "scoredMinutes": 17,
+    "leadInMinutes": 5,
+    "eventCount": 13,
+    "verified": true,
+    "documents": [
+      {
+        "name": "Enclosure v4",
+        "tab": "Lid",
+        "edits": 9
+      },
+      {
+        "name": "M5 Standoff Kit",
+        "tab": "Drawing",
+        "edits": 4
+      }
+    ]
+  },
+  {
+    "id": "s0254",
+    "date": "2026-08-22",
+    "start": "12:02",
+    "end": "12:17",
+    "rawMinutes": 15,
+    "scoredMinutes": 20,
+    "leadInMinutes": 5,
+    "eventCount": 21,
+    "verified": true,
+    "documents": [
+      {
+        "name": "Enclosure v4",
+        "tab": "Shell",
         "edits": 21
       }
     ]
   },
   {
     "id": "s0253",
-    "date": "2026-08-31",
-    "start": "13:38",
-    "end": "13:54",
-    "rawMinutes": 16,
-    "scoredMinutes": 21,
-    "leadInMinutes": 5,
-    "eventCount": 15,
-    "verified": true,
-    "documents": [
-      {
-        "name": "Enclosure v4",
-        "tab": "Shell",
-        "edits": 15
-      }
-    ]
-  },
-  {
-    "id": "s0252",
-    "date": "2026-08-31",
-    "start": "12:53",
-    "end": "13:04",
-    "rawMinutes": 11,
-    "scoredMinutes": 16,
-    "leadInMinutes": 5,
-    "eventCount": 12,
-    "verified": true,
-    "documents": [
-      {
-        "name": "Camera Mount Rev B",
-        "tab": "Assembly",
-        "edits": 12
-      }
-    ]
-  },
-  {
-    "id": "s0251",
-    "date": "2026-08-30",
-    "start": "12:36",
-    "end": "12:44",
-    "rawMinutes": 8,
-    "scoredMinutes": 13,
-    "leadInMinutes": 5,
-    "eventCount": 12,
-    "verified": true,
-    "documents": [
-      {
-        "name": "Camera Mount Rev B",
-        "tab": "Bracket",
-        "edits": 12
-      }
-    ]
-  },
-  {
-    "id": "s0250",
-    "date": "2026-08-30",
-    "start": "11:40",
-    "end": "11:58",
-    "rawMinutes": 18,
-    "scoredMinutes": 23,
-    "leadInMinutes": 5,
-    "eventCount": 18,
-    "verified": false,
-    "documents": [
-      {
-        "name": "Drivetrain Gearbox",
-        "tab": "Output Shaft",
-        "edits": 18
-      }
-    ]
-  },
-  {
-    "id": "s0249",
-    "date": "2026-08-30",
-    "start": "09:02",
-    "end": "09:03",
-    "rawMinutes": 1,
-    "scoredMinutes": 6,
-    "leadInMinutes": 5,
-    "eventCount": 3,
-    "verified": true,
-    "documents": [
-      {
-        "name": "Drivetrain Gearbox",
-        "tab": "Output Shaft",
-        "edits": 3
-      }
-    ]
-  },
-  {
-    "id": "s0248",
-    "date": "2026-08-29",
-    "start": "17:10",
-    "end": "17:11",
-    "rawMinutes": 1,
-    "scoredMinutes": 6,
-    "leadInMinutes": 5,
-    "eventCount": 3,
-    "verified": true,
-    "documents": [
-      {
-        "name": "M5 Standoff Kit",
-        "tab": "Drawing",
-        "edits": 3
-      }
-    ]
-  },
-  {
-    "id": "s0247",
-    "date": "2026-08-29",
-    "start": "14:24",
-    "end": "14:31",
-    "rawMinutes": 7,
-    "scoredMinutes": 12,
-    "leadInMinutes": 5,
-    "eventCount": 11,
-    "verified": false,
-    "documents": [
-      {
-        "name": "Enclosure v4",
-        "tab": "Gasket Groove",
-        "edits": 11
-      }
-    ]
-  },
-  {
-    "id": "s0246",
-    "date": "2026-08-29",
-    "start": "11:23",
-    "end": "11:26",
-    "rawMinutes": 3,
-    "scoredMinutes": 8,
-    "leadInMinutes": 5,
-    "eventCount": 4,
-    "verified": true,
-    "documents": [
-      {
-        "name": "Bearing Block",
-        "tab": "Cap",
-        "edits": 4
-      }
-    ]
-  },
-  {
-    "id": "s0245",
-    "date": "2026-08-28",
-    "start": "15:19",
-    "end": "15:36",
-    "rawMinutes": 17,
-    "scoredMinutes": 22,
-    "leadInMinutes": 5,
-    "eventCount": 18,
-    "verified": true,
-    "documents": [
-      {
-        "name": "Drivetrain Gearbox",
-        "tab": "Gear Train",
-        "edits": 18
-      }
-    ]
-  },
-  {
-    "id": "s0244",
-    "date": "2026-08-28",
-    "start": "13:21",
-    "end": "13:39",
-    "rawMinutes": 18,
-    "scoredMinutes": 23,
-    "leadInMinutes": 5,
-    "eventCount": 21,
-    "verified": true,
-    "documents": [
-      {
-        "name": "Rover Chassis",
-        "tab": "Suspension Mount",
-        "edits": 21
-      }
-    ]
-  },
-  {
-    "id": "s0243",
-    "date": "2026-08-28",
-    "start": "10:41",
-    "end": "10:47",
-    "rawMinutes": 6,
-    "scoredMinutes": 11,
+    "date": "2026-08-21",
+    "start": "12:19",
+    "end": "12:28",
+    "rawMinutes": 9,
+    "scoredMinutes": 14,
     "leadInMinutes": 5,
     "eventCount": 8,
     "verified": true,
     "documents": [
       {
-        "name": "Camera Mount Rev B",
-        "tab": "Bracket",
+        "name": "Bearing Block",
+        "tab": "Block",
         "edits": 8
       }
     ]
   },
   {
-    "id": "s0242",
-    "date": "2026-08-27",
-    "start": "14:06",
-    "end": "14:25",
-    "rawMinutes": 19,
-    "scoredMinutes": 24,
+    "id": "s0252",
+    "date": "2026-08-21",
+    "start": "11:43",
+    "end": "11:47",
+    "rawMinutes": 4,
+    "scoredMinutes": 9,
     "leadInMinutes": 5,
-    "eventCount": 18,
-    "verified": true,
-    "documents": [
-      {
-        "name": "Bearing Block",
-        "tab": "Block",
-        "edits": 18
-      }
-    ]
-  },
-  {
-    "id": "s0241",
-    "date": "2026-08-27",
-    "start": "10:53",
-    "end": "11:09",
-    "rawMinutes": 16,
-    "scoredMinutes": 21,
-    "leadInMinutes": 5,
-    "eventCount": 20,
+    "eventCount": 6,
     "verified": false,
-    "documents": [
-      {
-        "name": "Rover Chassis",
-        "tab": "Skid Plate",
-        "edits": 20
-      }
-    ]
-  },
-  {
-    "id": "s0240",
-    "date": "2026-08-26",
-    "start": "09:23",
-    "end": "09:25",
-    "rawMinutes": 2,
-    "scoredMinutes": 7,
-    "leadInMinutes": 5,
-    "eventCount": 5,
-    "verified": true,
     "documents": [
       {
         "name": "Drivetrain Gearbox",
         "tab": "Output Shaft",
-        "edits": 5
+        "edits": 6
       }
     ]
   },
   {
-    "id": "s0239",
-    "date": "2026-08-24",
-    "start": "12:37",
-    "end": "12:45",
-    "rawMinutes": 8,
-    "scoredMinutes": 13,
+    "id": "s0251",
+    "date": "2026-08-20",
+    "start": "12:11",
+    "end": "12:20",
+    "rawMinutes": 9,
+    "scoredMinutes": 14,
     "leadInMinutes": 5,
     "eventCount": 11,
-    "verified": false,
-    "documents": [
-      {
-        "name": "M5 Standoff Kit",
-        "tab": "Standoff",
-        "edits": 11
-      }
-    ]
-  },
-  {
-    "id": "s0238",
-    "date": "2026-08-24",
-    "start": "10:33",
-    "end": "10:39",
-    "rawMinutes": 6,
-    "scoredMinutes": 11,
-    "leadInMinutes": 5,
-    "eventCount": 6,
-    "verified": true,
-    "documents": [
-      {
-        "name": "Camera Mount Rev B",
-        "tab": "Ball Joint",
-        "edits": 4
-      },
-      {
-        "name": "M5 Standoff Kit",
-        "tab": "Drawing",
-        "edits": 2
-      }
-    ]
-  },
-  {
-    "id": "s0237",
-    "date": "2026-08-23",
-    "start": "09:50",
-    "end": "09:51",
-    "rawMinutes": 1,
-    "scoredMinutes": 6,
-    "leadInMinutes": 5,
-    "eventCount": 3,
-    "verified": true,
-    "documents": [
-      {
-        "name": "M5 Standoff Kit",
-        "tab": "Standoff",
-        "edits": 3
-      }
-    ]
-  },
-  {
-    "id": "s0236",
-    "date": "2026-08-22",
-    "start": "18:25",
-    "end": "18:41",
-    "rawMinutes": 16,
-    "scoredMinutes": 21,
-    "leadInMinutes": 5,
-    "eventCount": 21,
-    "verified": false,
-    "documents": [
-      {
-        "name": "Drivetrain Gearbox",
-        "tab": "Gear Train",
-        "edits": 21
-      }
-    ]
-  },
-  {
-    "id": "s0235",
-    "date": "2026-08-22",
-    "start": "15:42",
-    "end": "15:53",
-    "rawMinutes": 11,
-    "scoredMinutes": 16,
-    "leadInMinutes": 5,
-    "eventCount": 12,
-    "verified": true,
-    "documents": [
-      {
-        "name": "Rover Chassis",
-        "tab": "Suspension Mount",
-        "edits": 8
-      },
-      {
-        "name": "M5 Standoff Kit",
-        "tab": "Standoff",
-        "edits": 4
-      }
-    ]
-  },
-  {
-    "id": "s0234",
-    "date": "2026-08-22",
-    "start": "13:00",
-    "end": "13:01",
-    "rawMinutes": 1,
-    "scoredMinutes": 6,
-    "leadInMinutes": 5,
-    "eventCount": 3,
-    "verified": true,
-    "documents": [
-      {
-        "name": "Bearing Block",
-        "tab": "Block",
-        "edits": 3
-      }
-    ]
-  },
-  {
-    "id": "s0233",
-    "date": "2026-08-22",
-    "start": "10:04",
-    "end": "10:16",
-    "rawMinutes": 12,
-    "scoredMinutes": 17,
-    "leadInMinutes": 5,
-    "eventCount": 14,
-    "verified": true,
-    "documents": [
-      {
-        "name": "Bearing Block",
-        "tab": "Cap",
-        "edits": 14
-      }
-    ]
-  },
-  {
-    "id": "s0232",
-    "date": "2026-08-21",
-    "start": "14:39",
-    "end": "14:44",
-    "rawMinutes": 5,
-    "scoredMinutes": 10,
-    "leadInMinutes": 5,
-    "eventCount": 5,
     "verified": true,
     "documents": [
       {
         "name": "Enclosure v4",
         "tab": "Gasket Groove",
-        "edits": 5
+        "edits": 11
       }
     ]
   },
   {
-    "id": "s0231",
-    "date": "2026-08-21",
-    "start": "13:34",
-    "end": "13:36",
-    "rawMinutes": 2,
-    "scoredMinutes": 7,
+    "id": "s0250",
+    "date": "2026-08-20",
+    "start": "11:13",
+    "end": "11:25",
+    "rawMinutes": 12,
+    "scoredMinutes": 17,
     "leadInMinutes": 5,
-    "eventCount": 3,
+    "eventCount": 13,
     "verified": true,
     "documents": [
       {
         "name": "Enclosure v4",
         "tab": "Shell",
-        "edits": 3
-      }
-    ]
-  },
-  {
-    "id": "s0230",
-    "date": "2026-08-21",
-    "start": "11:42",
-    "end": "11:51",
-    "rawMinutes": 9,
-    "scoredMinutes": 14,
-    "leadInMinutes": 5,
-    "eventCount": 15,
-    "verified": true,
-    "documents": [
+        "edits": 9
+      },
       {
-        "name": "M5 Standoff Kit",
-        "tab": "Standoff",
-        "edits": 15
+        "name": "Camera Mount Rev B",
+        "tab": "Bracket",
+        "edits": 4
       }
     ]
   }
@@ -983,73 +816,73 @@ export const SESSIONS: Session[] = [
 export const DAILY: DayTotal[] = [
   {
     "date": "2026-03-12",
-    "scoredMinutes": 40,
-    "sessions": 2
+    "scoredMinutes": 19,
+    "sessions": 1
   },
   {
     "date": "2026-03-13",
-    "scoredMinutes": 23,
-    "sessions": 2
+    "scoredMinutes": 0,
+    "sessions": 0
   },
   {
     "date": "2026-03-14",
-    "scoredMinutes": 19,
-    "sessions": 2
+    "scoredMinutes": 0,
+    "sessions": 0
   },
   {
     "date": "2026-03-15",
-    "scoredMinutes": 0,
-    "sessions": 0
+    "scoredMinutes": 45,
+    "sessions": 2
   },
   {
     "date": "2026-03-16",
-    "scoredMinutes": 54,
-    "sessions": 4
+    "scoredMinutes": 17,
+    "sessions": 1
   },
   {
     "date": "2026-03-17",
+    "scoredMinutes": 29,
+    "sessions": 2
+  },
+  {
+    "date": "2026-03-18",
     "scoredMinutes": 0,
     "sessions": 0
   },
   {
-    "date": "2026-03-18",
-    "scoredMinutes": 32,
-    "sessions": 3
-  },
-  {
     "date": "2026-03-19",
-    "scoredMinutes": 33,
-    "sessions": 4
+    "scoredMinutes": 16,
+    "sessions": 1
   },
   {
     "date": "2026-03-20",
+    "scoredMinutes": 42,
+    "sessions": 4
+  },
+  {
+    "date": "2026-03-21",
     "scoredMinutes": 25,
     "sessions": 2
   },
   {
-    "date": "2026-03-21",
-    "scoredMinutes": 0,
-    "sessions": 0
-  },
-  {
     "date": "2026-03-22",
-    "scoredMinutes": 0,
-    "sessions": 0
+    "scoredMinutes": 20,
+    "sessions": 2
   },
   {
     "date": "2026-03-23",
-    "scoredMinutes": 0,
-    "sessions": 0
+    "scoredMinutes": 19,
+    "sessions": 3
   },
   {
     "date": "2026-03-24",
-    "scoredMinutes": 0,
-    "sessions": 0
+    "scoredMinutes": 32,
+    "sessions": 2
   },
   {
     "date": "2026-03-25",
-    "scoredMinutes": 0,
-    "sessions": 0
+    "scoredMinutes": 15,
+    "sessions": 2
   },
   {
     "date": "2026-03-26",
@@ -1058,12 +891,12 @@ export const DAILY: DayTotal[] = [
   },
   {
     "date": "2026-03-27",
-    "scoredMinutes": 0,
-    "sessions": 0
+    "scoredMinutes": 32,
+    "sessions": 2
   },
   {
     "date": "2026-03-28",
-    "scoredMinutes": 14,
+    "scoredMinutes": 22,
     "sessions": 1
   },
   {
@@ -1078,23 +911,23 @@ export const DAILY: DayTotal[] = [
   },
   {
     "date": "2026-03-31",
-    "scoredMinutes": 17,
-    "sessions": 2
+    "scoredMinutes": 0,
+    "sessions": 0
   },
   {
     "date": "2026-04-01",
-    "scoredMinutes": 0,
-    "sessions": 0
+    "scoredMinutes": 59,
+    "sessions": 3
   },
   {
     "date": "2026-04-02",
-    "scoredMinutes": 18,
-    "sessions": 2
+    "scoredMinutes": 50,
+    "sessions": 3
   },
   {
     "date": "2026-04-03",
-    "scoredMinutes": 0,
-    "sessions": 0
+    "scoredMinutes": 22,
+    "sessions": 2
   },
   {
     "date": "2026-04-04",
@@ -1108,23 +941,23 @@ export const DAILY: DayTotal[] = [
   },
   {
     "date": "2026-04-06",
-    "scoredMinutes": 59,
-    "sessions": 4
+    "scoredMinutes": 0,
+    "sessions": 0
   },
   {
     "date": "2026-04-07",
-    "scoredMinutes": 31,
-    "sessions": 3
+    "scoredMinutes": 22,
+    "sessions": 1
   },
   {
     "date": "2026-04-08",
-    "scoredMinutes": 38,
-    "sessions": 3
+    "scoredMinutes": 0,
+    "sessions": 0
   },
   {
     "date": "2026-04-09",
-    "scoredMinutes": 0,
-    "sessions": 0
+    "scoredMinutes": 6,
+    "sessions": 1
   },
   {
     "date": "2026-04-10",
@@ -1133,28 +966,28 @@ export const DAILY: DayTotal[] = [
   },
   {
     "date": "2026-04-11",
-    "scoredMinutes": 0,
-    "sessions": 0
+    "scoredMinutes": 19,
+    "sessions": 2
   },
   {
     "date": "2026-04-12",
-    "scoredMinutes": 38,
-    "sessions": 3
+    "scoredMinutes": 21,
+    "sessions": 2
   },
   {
     "date": "2026-04-13",
-    "scoredMinutes": 42,
-    "sessions": 3
+    "scoredMinutes": 28,
+    "sessions": 2
   },
   {
     "date": "2026-04-14",
-    "scoredMinutes": 0,
-    "sessions": 0
+    "scoredMinutes": 54,
+    "sessions": 3
   },
   {
     "date": "2026-04-15",
-    "scoredMinutes": 0,
-    "sessions": 0
+    "scoredMinutes": 33,
+    "sessions": 3
   },
   {
     "date": "2026-04-16",
@@ -1163,8 +996,8 @@ export const DAILY: DayTotal[] = [
   },
   {
     "date": "2026-04-17",
-    "scoredMinutes": 12,
-    "sessions": 2
+    "scoredMinutes": 36,
+    "sessions": 3
   },
   {
     "date": "2026-04-18",
@@ -1173,103 +1006,103 @@ export const DAILY: DayTotal[] = [
   },
   {
     "date": "2026-04-19",
-    "scoredMinutes": 12,
+    "scoredMinutes": 29,
     "sessions": 2
   },
   {
     "date": "2026-04-20",
-    "scoredMinutes": 0,
-    "sessions": 0
-  },
-  {
-    "date": "2026-04-21",
     "scoredMinutes": 41,
     "sessions": 4
   },
   {
-    "date": "2026-04-22",
-    "scoredMinutes": 31,
-    "sessions": 2
-  },
-  {
-    "date": "2026-04-23",
-    "scoredMinutes": 48,
-    "sessions": 4
-  },
-  {
-    "date": "2026-04-24",
-    "scoredMinutes": 54,
-    "sessions": 4
-  },
-  {
-    "date": "2026-04-25",
-    "scoredMinutes": 45,
-    "sessions": 2
-  },
-  {
-    "date": "2026-04-26",
+    "date": "2026-04-21",
     "scoredMinutes": 0,
     "sessions": 0
   },
   {
-    "date": "2026-04-27",
-    "scoredMinutes": 6,
-    "sessions": 1
-  },
-  {
-    "date": "2026-04-28",
-    "scoredMinutes": 14,
-    "sessions": 1
-  },
-  {
-    "date": "2026-04-29",
-    "scoredMinutes": 21,
-    "sessions": 1
-  },
-  {
-    "date": "2026-04-30",
-    "scoredMinutes": 28,
+    "date": "2026-04-22",
+    "scoredMinutes": 45,
     "sessions": 3
   },
   {
-    "date": "2026-05-01",
-    "scoredMinutes": 42,
+    "date": "2026-04-23",
+    "scoredMinutes": 41,
+    "sessions": 3
+  },
+  {
+    "date": "2026-04-24",
+    "scoredMinutes": 0,
+    "sessions": 0
+  },
+  {
+    "date": "2026-04-25",
+    "scoredMinutes": 53,
     "sessions": 4
   },
   {
-    "date": "2026-05-02",
-    "scoredMinutes": 30,
+    "date": "2026-04-26",
+    "scoredMinutes": 40,
+    "sessions": 4
+  },
+  {
+    "date": "2026-04-27",
+    "scoredMinutes": 40,
+    "sessions": 4
+  },
+  {
+    "date": "2026-04-28",
+    "scoredMinutes": 38,
     "sessions": 2
   },
   {
+    "date": "2026-04-29",
+    "scoredMinutes": 0,
+    "sessions": 0
+  },
+  {
+    "date": "2026-04-30",
+    "scoredMinutes": 33,
+    "sessions": 4
+  },
+  {
+    "date": "2026-05-01",
+    "scoredMinutes": 0,
+    "sessions": 0
+  },
+  {
+    "date": "2026-05-02",
+    "scoredMinutes": 0,
+    "sessions": 0
+  },
+  {
     "date": "2026-05-03",
-    "scoredMinutes": 19,
-    "sessions": 1
+    "scoredMinutes": 0,
+    "sessions": 0
   },
   {
     "date": "2026-05-04",
-    "scoredMinutes": 20,
+    "scoredMinutes": 18,
     "sessions": 1
   },
   {
     "date": "2026-05-05",
-    "scoredMinutes": 0,
-    "sessions": 0
-  },
-  {
-    "date": "2026-05-06",
-    "scoredMinutes": 0,
-    "sessions": 0
-  },
-  {
-    "date": "2026-05-07",
-    "scoredMinutes": 16,
+    "scoredMinutes": 13,
     "sessions": 2
   },
   {
+    "date": "2026-05-06",
+    "scoredMinutes": 28,
+    "sessions": 2
+  },
+  {
+    "date": "2026-05-07",
+    "scoredMinutes": 49,
+    "sessions": 4
+  },
+  {
     "date": "2026-05-08",
-    "scoredMinutes": 22,
-    "sessions": 1
+    "scoredMinutes": 0,
+    "sessions": 0
   },
   {
     "date": "2026-05-09",
@@ -1278,137 +1111,137 @@ export const DAILY: DayTotal[] = [
   },
   {
     "date": "2026-05-10",
-    "scoredMinutes": 22,
-    "sessions": 1
+    "scoredMinutes": 0,
+    "sessions": 0
   },
   {
     "date": "2026-05-11",
-    "scoredMinutes": 0,
-    "sessions": 0
-  },
-  {
-    "date": "2026-05-12",
-    "scoredMinutes": 0,
-    "sessions": 0
-  },
-  {
-    "date": "2026-05-13",
-    "scoredMinutes": 18,
+    "scoredMinutes": 13,
     "sessions": 2
   },
   {
+    "date": "2026-05-12",
+    "scoredMinutes": 32,
+    "sessions": 4
+  },
+  {
+    "date": "2026-05-13",
+    "scoredMinutes": 25,
+    "sessions": 3
+  },
+  {
     "date": "2026-05-14",
-    "scoredMinutes": 12,
-    "sessions": 1
+    "scoredMinutes": 63,
+    "sessions": 3
   },
   {
     "date": "2026-05-15",
-    "scoredMinutes": 37,
+    "scoredMinutes": 58,
     "sessions": 4
   },
   {
     "date": "2026-05-16",
-    "scoredMinutes": 12,
-    "sessions": 1
+    "scoredMinutes": 28,
+    "sessions": 2
   },
   {
     "date": "2026-05-17",
+    "scoredMinutes": 36,
+    "sessions": 2
+  },
+  {
+    "date": "2026-05-18",
     "scoredMinutes": 6,
     "sessions": 1
   },
   {
-    "date": "2026-05-18",
-    "scoredMinutes": 29,
-    "sessions": 2
-  },
-  {
     "date": "2026-05-19",
-    "scoredMinutes": 18,
-    "sessions": 2
+    "scoredMinutes": 42,
+    "sessions": 4
   },
   {
     "date": "2026-05-20",
-    "scoredMinutes": 31,
-    "sessions": 2
-  },
-  {
-    "date": "2026-05-21",
-    "scoredMinutes": 28,
+    "scoredMinutes": 45,
     "sessions": 3
   },
   {
+    "date": "2026-05-21",
+    "scoredMinutes": 49,
+    "sessions": 4
+  },
+  {
     "date": "2026-05-22",
-    "scoredMinutes": 27,
-    "sessions": 2
+    "scoredMinutes": 21,
+    "sessions": 3
   },
   {
     "date": "2026-05-23",
-    "scoredMinutes": 35,
+    "scoredMinutes": 37,
     "sessions": 2
   },
   {
     "date": "2026-05-24",
-    "scoredMinutes": 19,
+    "scoredMinutes": 38,
     "sessions": 2
   },
   {
     "date": "2026-05-25",
-    "scoredMinutes": 44,
+    "scoredMinutes": 59,
     "sessions": 3
   },
   {
     "date": "2026-05-26",
-    "scoredMinutes": 42,
-    "sessions": 2
+    "scoredMinutes": 24,
+    "sessions": 1
   },
   {
     "date": "2026-05-27",
-    "scoredMinutes": 20,
+    "scoredMinutes": 12,
     "sessions": 2
   },
   {
     "date": "2026-05-28",
-    "scoredMinutes": 6,
-    "sessions": 1
+    "scoredMinutes": 38,
+    "sessions": 2
   },
   {
     "date": "2026-05-29",
-    "scoredMinutes": 44,
-    "sessions": 4
+    "scoredMinutes": 9,
+    "sessions": 1
   },
   {
     "date": "2026-05-30",
-    "scoredMinutes": 24,
+    "scoredMinutes": 30,
     "sessions": 2
   },
   {
     "date": "2026-05-31",
-    "scoredMinutes": 33,
-    "sessions": 3
+    "scoredMinutes": 7,
+    "sessions": 1
   },
   {
     "date": "2026-06-01",
-    "scoredMinutes": 20,
-    "sessions": 2
-  },
-  {
-    "date": "2026-06-02",
-    "scoredMinutes": 39,
+    "scoredMinutes": 40,
     "sessions": 3
   },
   {
+    "date": "2026-06-02",
+    "scoredMinutes": 8,
+    "sessions": 1
+  },
+  {
     "date": "2026-06-03",
-    "scoredMinutes": 21,
+    "scoredMinutes": 33,
     "sessions": 2
   },
   {
     "date": "2026-06-04",
-    "scoredMinutes": 17,
-    "sessions": 2
+    "scoredMinutes": 20,
+    "sessions": 1
   },
   {
     "date": "2026-06-05",
-    "scoredMinutes": 10,
+    "scoredMinutes": 8,
     "sessions": 1
   },
   {
@@ -1428,73 +1261,73 @@ export const DAILY: DayTotal[] = [
   },
   {
     "date": "2026-06-09",
-    "scoredMinutes": 6,
-    "sessions": 1
+    "scoredMinutes": 59,
+    "sessions": 4
   },
   {
     "date": "2026-06-10",
-    "scoredMinutes": 16,
-    "sessions": 1
+    "scoredMinutes": 37,
+    "sessions": 2
   },
   {
     "date": "2026-06-11",
-    "scoredMinutes": 30,
+    "scoredMinutes": 43,
     "sessions": 3
   },
   {
     "date": "2026-06-12",
-    "scoredMinutes": 38,
-    "sessions": 4
+    "scoredMinutes": 36,
+    "sessions": 2
   },
   {
     "date": "2026-06-13",
+    "scoredMinutes": 39,
+    "sessions": 3
+  },
+  {
+    "date": "2026-06-14",
     "scoredMinutes": 0,
     "sessions": 0
   },
   {
-    "date": "2026-06-14",
-    "scoredMinutes": 27,
-    "sessions": 2
-  },
-  {
     "date": "2026-06-15",
-    "scoredMinutes": 48,
-    "sessions": 3
+    "scoredMinutes": 0,
+    "sessions": 0
   },
   {
     "date": "2026-06-16",
-    "scoredMinutes": 43,
-    "sessions": 2
+    "scoredMinutes": 7,
+    "sessions": 1
   },
   {
     "date": "2026-06-17",
-    "scoredMinutes": 44,
+    "scoredMinutes": 69,
     "sessions": 3
   },
   {
     "date": "2026-06-18",
-    "scoredMinutes": 38,
-    "sessions": 3
-  },
-  {
-    "date": "2026-06-19",
-    "scoredMinutes": 22,
-    "sessions": 3
-  },
-  {
-    "date": "2026-06-20",
     "scoredMinutes": 0,
     "sessions": 0
   },
   {
+    "date": "2026-06-19",
+    "scoredMinutes": 11,
+    "sessions": 1
+  },
+  {
+    "date": "2026-06-20",
+    "scoredMinutes": 20,
+    "sessions": 2
+  },
+  {
     "date": "2026-06-21",
-    "scoredMinutes": 22,
+    "scoredMinutes": 20,
     "sessions": 2
   },
   {
     "date": "2026-06-22",
-    "scoredMinutes": 6,
-    "sessions": 1
+    "scoredMinutes": 0,
+    "sessions": 0
   },
   {
     "date": "2026-06-23",
@@ -1503,28 +1336,28 @@ export const DAILY: DayTotal[] = [
   },
   {
     "date": "2026-06-24",
-    "scoredMinutes": 14,
-    "sessions": 2
+    "scoredMinutes": 0,
+    "sessions": 0
   },
   {
     "date": "2026-06-25",
-    "scoredMinutes": 17,
-    "sessions": 1
+    "scoredMinutes": 0,
+    "sessions": 0
   },
   {
     "date": "2026-06-26",
-    "scoredMinutes": 0,
-    "sessions": 0
+    "scoredMinutes": 21,
+    "sessions": 1
   },
   {
     "date": "2026-06-27",
-    "scoredMinutes": 24,
-    "sessions": 3
+    "scoredMinutes": 63,
+    "sessions": 4
   },
   {
     "date": "2026-06-28",
-    "scoredMinutes": 0,
-    "sessions": 0
+    "scoredMinutes": 15,
+    "sessions": 2
   },
   {
     "date": "2026-06-29",
@@ -1533,8 +1366,8 @@ export const DAILY: DayTotal[] = [
   },
   {
     "date": "2026-06-30",
-    "scoredMinutes": 6,
-    "sessions": 1
+    "scoredMinutes": 0,
+    "sessions": 0
   },
   {
     "date": "2026-07-01",
@@ -1543,13 +1376,13 @@ export const DAILY: DayTotal[] = [
   },
   {
     "date": "2026-07-02",
-    "scoredMinutes": 32,
+    "scoredMinutes": 18,
     "sessions": 2
   },
   {
     "date": "2026-07-03",
-    "scoredMinutes": 26,
-    "sessions": 2
+    "scoredMinutes": 41,
+    "sessions": 3
   },
   {
     "date": "2026-07-04",
@@ -1558,48 +1391,48 @@ export const DAILY: DayTotal[] = [
   },
   {
     "date": "2026-07-05",
+    "scoredMinutes": 7,
+    "sessions": 1
+  },
+  {
+    "date": "2026-07-06",
     "scoredMinutes": 0,
     "sessions": 0
   },
   {
-    "date": "2026-07-06",
-    "scoredMinutes": 59,
-    "sessions": 4
-  },
-  {
     "date": "2026-07-07",
-    "scoredMinutes": 27,
+    "scoredMinutes": 19,
     "sessions": 2
   },
   {
     "date": "2026-07-08",
-    "scoredMinutes": 35,
-    "sessions": 3
-  },
-  {
-    "date": "2026-07-09",
-    "scoredMinutes": 54,
-    "sessions": 4
-  },
-  {
-    "date": "2026-07-10",
-    "scoredMinutes": 0,
-    "sessions": 0
-  },
-  {
-    "date": "2026-07-11",
     "scoredMinutes": 32,
     "sessions": 2
   },
   {
+    "date": "2026-07-09",
+    "scoredMinutes": 42,
+    "sessions": 3
+  },
+  {
+    "date": "2026-07-10",
+    "scoredMinutes": 12,
+    "sessions": 1
+  },
+  {
+    "date": "2026-07-11",
+    "scoredMinutes": 15,
+    "sessions": 1
+  },
+  {
     "date": "2026-07-12",
-    "scoredMinutes": 23,
-    "sessions": 2
+    "scoredMinutes": 0,
+    "sessions": 0
   },
   {
     "date": "2026-07-13",
-    "scoredMinutes": 0,
-    "sessions": 0
+    "scoredMinutes": 38,
+    "sessions": 3
   },
   {
     "date": "2026-07-14",
@@ -1608,18 +1441,18 @@ export const DAILY: DayTotal[] = [
   },
   {
     "date": "2026-07-15",
-    "scoredMinutes": 34,
-    "sessions": 2
+    "scoredMinutes": 0,
+    "sessions": 0
   },
   {
     "date": "2026-07-16",
-    "scoredMinutes": 0,
-    "sessions": 0
+    "scoredMinutes": 19,
+    "sessions": 2
   },
   {
     "date": "2026-07-17",
-    "scoredMinutes": 0,
-    "sessions": 0
+    "scoredMinutes": 20,
+    "sessions": 2
   },
   {
     "date": "2026-07-18",
@@ -1633,68 +1466,68 @@ export const DAILY: DayTotal[] = [
   },
   {
     "date": "2026-07-20",
-    "scoredMinutes": 0,
-    "sessions": 0
+    "scoredMinutes": 30,
+    "sessions": 2
   },
   {
     "date": "2026-07-21",
-    "scoredMinutes": 18,
-    "sessions": 2
-  },
-  {
-    "date": "2026-07-22",
-    "scoredMinutes": 26,
-    "sessions": 2
-  },
-  {
-    "date": "2026-07-23",
-    "scoredMinutes": 54,
-    "sessions": 3
-  },
-  {
-    "date": "2026-07-24",
     "scoredMinutes": 0,
     "sessions": 0
   },
   {
+    "date": "2026-07-22",
+    "scoredMinutes": 19,
+    "sessions": 1
+  },
+  {
+    "date": "2026-07-23",
+    "scoredMinutes": 55,
+    "sessions": 4
+  },
+  {
+    "date": "2026-07-24",
+    "scoredMinutes": 21,
+    "sessions": 2
+  },
+  {
     "date": "2026-07-25",
-    "scoredMinutes": 17,
+    "scoredMinutes": 33,
     "sessions": 2
   },
   {
     "date": "2026-07-26",
-    "scoredMinutes": 18,
-    "sessions": 2
+    "scoredMinutes": 0,
+    "sessions": 0
   },
   {
     "date": "2026-07-27",
-    "scoredMinutes": 42,
-    "sessions": 3
+    "scoredMinutes": 26,
+    "sessions": 2
   },
   {
     "date": "2026-07-28",
-    "scoredMinutes": 12,
-    "sessions": 1
+    "scoredMinutes": 0,
+    "sessions": 0
   },
   {
     "date": "2026-07-29",
-    "scoredMinutes": 7,
-    "sessions": 1
+    "scoredMinutes": 0,
+    "sessions": 0
   },
   {
     "date": "2026-07-30",
-    "scoredMinutes": 36,
-    "sessions": 2
+    "scoredMinutes": 0,
+    "sessions": 0
   },
   {
     "date": "2026-07-31",
-    "scoredMinutes": 16,
-    "sessions": 2
+    "scoredMinutes": 9,
+    "sessions": 1
   },
   {
     "date": "2026-08-01",
-    "scoredMinutes": 29,
-    "sessions": 2
+    "scoredMinutes": 0,
+    "sessions": 0
   },
   {
     "date": "2026-08-02",
@@ -1703,113 +1536,113 @@ export const DAILY: DayTotal[] = [
   },
   {
     "date": "2026-08-03",
-    "scoredMinutes": 22,
+    "scoredMinutes": 19,
     "sessions": 2
   },
   {
     "date": "2026-08-04",
-    "scoredMinutes": 36,
+    "scoredMinutes": 19,
     "sessions": 2
   },
   {
     "date": "2026-08-05",
-    "scoredMinutes": 19,
-    "sessions": 1
+    "scoredMinutes": 0,
+    "sessions": 0
   },
   {
     "date": "2026-08-06",
-    "scoredMinutes": 39,
-    "sessions": 4
-  },
-  {
-    "date": "2026-08-07",
-    "scoredMinutes": 37,
+    "scoredMinutes": 61,
     "sessions": 3
   },
   {
+    "date": "2026-08-07",
+    "scoredMinutes": 0,
+    "sessions": 0
+  },
+  {
     "date": "2026-08-08",
-    "scoredMinutes": 42,
+    "scoredMinutes": 62,
     "sessions": 3
   },
   {
     "date": "2026-08-09",
-    "scoredMinutes": 0,
-    "sessions": 0
+    "scoredMinutes": 27,
+    "sessions": 2
   },
   {
     "date": "2026-08-10",
-    "scoredMinutes": 6,
-    "sessions": 1
-  },
-  {
-    "date": "2026-08-11",
-    "scoredMinutes": 0,
-    "sessions": 0
-  },
-  {
-    "date": "2026-08-12",
-    "scoredMinutes": 0,
-    "sessions": 0
-  },
-  {
-    "date": "2026-08-13",
-    "scoredMinutes": 9,
-    "sessions": 1
-  },
-  {
-    "date": "2026-08-14",
-    "scoredMinutes": 0,
-    "sessions": 0
-  },
-  {
-    "date": "2026-08-15",
-    "scoredMinutes": 0,
-    "sessions": 0
-  },
-  {
-    "date": "2026-08-16",
-    "scoredMinutes": 0,
-    "sessions": 0
-  },
-  {
-    "date": "2026-08-17",
-    "scoredMinutes": 0,
-    "sessions": 0
-  },
-  {
-    "date": "2026-08-18",
-    "scoredMinutes": 27,
-    "sessions": 3
-  },
-  {
-    "date": "2026-08-19",
-    "scoredMinutes": 0,
-    "sessions": 0
-  },
-  {
-    "date": "2026-08-20",
-    "scoredMinutes": 0,
-    "sessions": 0
-  },
-  {
-    "date": "2026-08-21",
-    "scoredMinutes": 31,
-    "sessions": 3
-  },
-  {
-    "date": "2026-08-22",
-    "scoredMinutes": 60,
+    "scoredMinutes": 41,
     "sessions": 4
   },
   {
-    "date": "2026-08-23",
-    "scoredMinutes": 6,
+    "date": "2026-08-11",
+    "scoredMinutes": 10,
     "sessions": 1
   },
   {
-    "date": "2026-08-24",
-    "scoredMinutes": 24,
+    "date": "2026-08-12",
+    "scoredMinutes": 35,
+    "sessions": 3
+  },
+  {
+    "date": "2026-08-13",
+    "scoredMinutes": 0,
+    "sessions": 0
+  },
+  {
+    "date": "2026-08-14",
+    "scoredMinutes": 80,
+    "sessions": 4
+  },
+  {
+    "date": "2026-08-15",
+    "scoredMinutes": 36,
+    "sessions": 4
+  },
+  {
+    "date": "2026-08-16",
+    "scoredMinutes": 18,
+    "sessions": 1
+  },
+  {
+    "date": "2026-08-17",
+    "scoredMinutes": 29,
     "sessions": 2
+  },
+  {
+    "date": "2026-08-18",
+    "scoredMinutes": 15,
+    "sessions": 2
+  },
+  {
+    "date": "2026-08-19",
+    "scoredMinutes": 13,
+    "sessions": 2
+  },
+  {
+    "date": "2026-08-20",
+    "scoredMinutes": 31,
+    "sessions": 2
+  },
+  {
+    "date": "2026-08-21",
+    "scoredMinutes": 23,
+    "sessions": 2
+  },
+  {
+    "date": "2026-08-22",
+    "scoredMinutes": 37,
+    "sessions": 2
+  },
+  {
+    "date": "2026-08-23",
+    "scoredMinutes": 39,
+    "sessions": 2
+  },
+  {
+    "date": "2026-08-24",
+    "scoredMinutes": 0,
+    "sessions": 0
   },
   {
     "date": "2026-08-25",
@@ -1818,77 +1651,77 @@ export const DAILY: DayTotal[] = [
   },
   {
     "date": "2026-08-26",
-    "scoredMinutes": 7,
-    "sessions": 1
+    "scoredMinutes": 0,
+    "sessions": 0
   },
   {
     "date": "2026-08-27",
-    "scoredMinutes": 45,
-    "sessions": 2
-  },
-  {
-    "date": "2026-08-28",
-    "scoredMinutes": 56,
-    "sessions": 3
-  },
-  {
-    "date": "2026-08-29",
-    "scoredMinutes": 26,
-    "sessions": 3
-  },
-  {
-    "date": "2026-08-30",
-    "scoredMinutes": 42,
-    "sessions": 3
-  },
-  {
-    "date": "2026-08-31",
-    "scoredMinutes": 66,
-    "sessions": 4
-  },
-  {
-    "date": "2026-09-01",
-    "scoredMinutes": 7,
+    "scoredMinutes": 22,
     "sessions": 1
   },
   {
-    "date": "2026-09-02",
+    "date": "2026-08-28",
     "scoredMinutes": 13,
     "sessions": 2
   },
   {
+    "date": "2026-08-29",
+    "scoredMinutes": 16,
+    "sessions": 1
+  },
+  {
+    "date": "2026-08-30",
+    "scoredMinutes": 6,
+    "sessions": 1
+  },
+  {
+    "date": "2026-08-31",
+    "scoredMinutes": 46,
+    "sessions": 3
+  },
+  {
+    "date": "2026-09-01",
+    "scoredMinutes": 47,
+    "sessions": 2
+  },
+  {
+    "date": "2026-09-02",
+    "scoredMinutes": 23,
+    "sessions": 1
+  },
+  {
     "date": "2026-09-03",
-    "scoredMinutes": 20,
+    "scoredMinutes": 26,
     "sessions": 2
   },
   {
     "date": "2026-09-04",
-    "scoredMinutes": 58,
-    "sessions": 4
+    "scoredMinutes": 23,
+    "sessions": 3
   },
   {
     "date": "2026-09-05",
-    "scoredMinutes": 33,
-    "sessions": 2
+    "scoredMinutes": 47,
+    "sessions": 3
   },
   {
     "date": "2026-09-06",
-    "scoredMinutes": 46,
-    "sessions": 4
+    "scoredMinutes": 11,
+    "sessions": 1
   },
   {
     "date": "2026-09-07",
-    "scoredMinutes": 27,
-    "sessions": 2
+    "scoredMinutes": 48,
+    "sessions": 3
   },
   {
     "date": "2026-09-08",
-    "scoredMinutes": 28,
+    "scoredMinutes": 27,
     "sessions": 2
   },
   {
     "date": "2026-09-09",
-    "scoredMinutes": 27,
+    "scoredMinutes": 15,
     "sessions": 2
   }
 ];
@@ -1897,15 +1730,15 @@ export const WEEK: WeekDay[] = [
   {
     "label": "Mon",
     "date": "2026-09-07",
-    "scoredMinutes": 27,
-    "sessions": 2,
+    "scoredMinutes": 48,
+    "sessions": 3,
     "isToday": false,
     "isFuture": false
   },
   {
     "label": "Tue",
     "date": "2026-09-08",
-    "scoredMinutes": 28,
+    "scoredMinutes": 27,
     "sessions": 2,
     "isToday": false,
     "isFuture": false
@@ -1913,7 +1746,7 @@ export const WEEK: WeekDay[] = [
   {
     "label": "Wed",
     "date": "2026-09-09",
-    "scoredMinutes": 27,
+    "scoredMinutes": 15,
     "sessions": 2,
     "isToday": true,
     "isFuture": false
@@ -1952,69 +1785,69 @@ export const WEEK: WeekDay[] = [
   }
 ];
 
-export const TODAY_STATS = {
-  "scoredMinutes": 27,
+export const TODAY_STATS: TodayStats = {
+  "scoredMinutes": 15,
   "sessions": 2,
-  "events": 25
-} as const;
+  "events": 10
+};
 
-export const STREAK = {
-  "current": 15,
-  "longest": 24,
-  "weekMinutes": 82,
+export const STREAK: StreakStats = {
+  "current": 14,
+  "longest": 26,
+  "weekMinutes": 90,
   "weekDaysElapsed": 3,
-  "lastWeekMinutes": 243
-} as const;
+  "lastWeekMinutes": 223
+};
 
-export const PROFILE = {
+export const PROFILE: ProfileStats = {
   "name": "You",
   "handle": "@yoni",
   "initials": "YS",
   "memberSince": "March 2026",
-  "lifetimeMinutes": 3415,
-  "lifetimeHours": 56.9,
-  "totalSessions": 276,
-  "activeDays": 121,
-  "longestStreak": 24,
-  "currentStreak": 15,
-  "medianSessionMinutes": 11,
-  "verifiedShare": 80
-} as const;
+  "lifetimeMinutes": 3793,
+  "lifetimeHours": 63.2,
+  "totalSessions": 284,
+  "activeDays": 126,
+  "longestStreak": 26,
+  "currentStreak": 14,
+  "medianSessionMinutes": 12,
+  "verifiedShare": 82
+};
 
 export const RECORDS: PersonalRecord[] = [
   {
     "label": "Longest session",
     "value": 25,
     "unit": "min",
-    "when": "2026-04-12"
+    "when": "2026-05-14"
   },
   {
     "label": "Best day",
-    "value": 66,
+    "value": 80,
     "unit": "min",
-    "when": "2026-08-31"
+    "when": "2026-08-14"
   },
   {
     "label": "Best week",
-    "value": 4.3,
+    "value": 4.9,
     "unit": "hrs",
-    "when": "2026-08-27"
+    "when": "2026-05-19"
   },
   {
     "label": "Most sessions in a day",
     "value": 4,
     "unit": "",
-    "when": "2026-03-16"
+    "when": "2026-03-20"
   },
   {
     "label": "Most edits in a session",
-    "value": 31,
+    "value": 29,
     "unit": "",
-    "when": "2026-04-12"
+    "when": "2026-05-14"
   },
   {
     "label": "Longest streak",
-    "value": 24,
+    "value": 26,
     "unit": "days",
     "when": ""
   }
@@ -2051,8 +1884,8 @@ export const LEAGUE: League = {
       "id": "m3",
       "name": "You",
       "initials": "YS",
-      "scoredMinutes": 82,
-      "sessions": 6,
+      "scoredMinutes": 90,
+      "sessions": 7,
       "lastRank": 5,
       "isMe": true,
       "rank": 3,

@@ -1,4 +1,3 @@
-import { NavBar } from "@/components/NavBar";
 import { SessionRow } from "@/components/SessionRow";
 import { SESSIONS } from "@/lib/fixtures";
 import { dayLabel, duration, plural } from "@/lib/format";
@@ -13,9 +12,7 @@ export default function SessionsScreen() {
   }
 
   return (
-    <>
-      <NavBar title="Sessions" />
-      <main className="screen">
+    <main className="screen">
         <h1 className="screen__title rise">Sessions</h1>
         <p className="screen__subtitle t-subhead">Last {byDay.size} days of tracked work.</p>
 
@@ -35,7 +32,6 @@ export default function SessionsScreen() {
             </section>
           );
         })}
-      </main>
-    </>
+    </main>
   );
 }

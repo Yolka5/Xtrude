@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { motion } from "motion/react";
 import { Icon, type IconName } from "./Icon";
 
 const TABS: { href: string; label: string; icon: IconName; match: RegExp }[] = [
@@ -12,13 +13,16 @@ const TABS: { href: string; label: string; icon: IconName; match: RegExp }[] = [
 ];
 
 /**
- * Functional layer: Liquid Glass, floating clear of the screen edges, with
- * content scrolling behind it. Sits above the iOS home indicator via
- * env(safe-area-inset-bottom) - see .tabbar in globals.css.
+ * Functional layer: Liquid Glass, floating clear of the screen edges, sitting
+ * above the iOS home indicator via env(safe-area-inset-bottom).
+ *
+ * The selection pill carries a shared layoutId, so switching tabs slides one
+ * pill across rather than cutting between two. Selection is still signalled
+ * three ways - pill, colour, and a heavier glyph - so it survives Reduce
+ * Motion and colour blindness alike.
  */
 export function TabBar() {
   const raw = usePathname() || "/";
-  // trailingSlash: true in next.config means paths arrive as "/league/"
   const path = raw.length > 1 ? raw.replace(/\/+$/, "") || "/" : raw;
 
   return (
@@ -30,10 +34,20 @@ export function TabBar() {
           <Link
             key={t.href}
             href={t.href}
-            className="tab pressable"
+            className="tab"
             aria-current={active ? "page" : undefined}
           >
-            <Icon name={t.icon} size={23} weight={active ? 2.2 : 1.75} />
+            {active ? (
+              <motion.span
+                className="tab__pill"
+                layoutId="tab-pill"
+                transition={{ type: "spring", stiffness: 420, damping: 34, mass: 0.8 }}
+                aria-hidden="true"
+              />
+            ) : null}
+            <span className="tab__icon">
+              <Icon name={t.icon} size={23} weight={active ? 2.2 : 1.75} />
+            </span>
             <span className="tab__label">{t.label}</span>
           </Link>
         );

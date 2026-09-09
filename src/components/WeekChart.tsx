@@ -1,15 +1,19 @@
+"use client";
+
+import { motion } from "motion/react";
 import { WEEK } from "@/lib/fixtures";
 import { duration, durationSpoken } from "@/lib/format";
 
 /**
- * This week, one bar per day. Content layer: solid card, opaque axis labels,
- * no translucency behind any value.
+ * This week, one bar per day. Content layer: solid card, opaque axis labels.
  *
- * The y-scale steps in 15-minute increments from a 45-minute floor rather than
- * auto-scaling to the week's own max. Sessions here are 5-25 minutes, so a
+ * The scale steps in 15-minute increments from a 45-minute floor rather than
+ * auto-scaling to the week's own max. Sessions here run 5-25 minutes, so a
  * free-floating scale would make a 27-minute Monday and a 28-minute Tuesday
- * look wildly different. Stepping keeps day-to-day comparison honest without
- * wasting half the plot on empty headroom.
+ * look wildly different.
+ *
+ * Bars use a gradient whose lightest stop still clears 3:1 against the white
+ * card, so the whole mark meets the graphic-object bar, not just its base.
  */
 const FLOOR = 45;
 const STEP = 15;
@@ -19,7 +23,9 @@ export function WeekChart() {
   const peak = Math.max(FLOOR, Math.ceil(max / STEP) * STEP);
 
   return (
-    <div className="weekchart" role="img"
+    <div
+      className="weekchart"
+      role="img"
       aria-label={
         "Modeled time this week: " +
         WEEK.filter((d) => !d.isFuture)
@@ -28,7 +34,7 @@ export function WeekChart() {
       }
     >
       {WEEK.map((d, i) => {
-        const pct = d.scoredMinutes === 0 ? 0 : Math.max(6, (d.scoredMinutes / peak) * 100);
+        const pct = d.scoredMinutes === 0 ? 0 : Math.max(7, (d.scoredMinutes / peak) * 100);
         return (
           <div
             key={d.date}
@@ -42,15 +48,14 @@ export function WeekChart() {
               {d.scoredMinutes ? duration(d.scoredMinutes) : d.isFuture ? "" : "-"}
             </span>
             <div className="weekchart__track">
-              <div
-                className={
-                  "weekchart__bar" +
-                  (d.scoredMinutes === 0 ? " weekchart__bar--empty" : "") +
-                  (d.isToday ? " weekchart__bar--today" : "")
-                }
-                style={{
-                  height: d.scoredMinutes === 0 ? "3px" : `${pct}%`,
-                  animationDelay: `${i * 45}ms`,
+              <motion.div
+                className={"weekchart__bar" + (d.scoredMinutes === 0 ? " weekchart__bar--empty" : "")}
+                style={{ height: d.scoredMinutes === 0 ? 4 : `${pct}%` }}
+                initial={{ scaleY: 0 }}
+                animate={{ scaleY: 1 }}
+                transition={{
+                  type: "spring", stiffness: 150, damping: 19, mass: 0.9,
+                  delay: 0.08 + i * 0.055,
                 }}
               />
             </div>
