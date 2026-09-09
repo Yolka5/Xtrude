@@ -1,0 +1,852 @@
+/* ===========================================================================
+   Xtrude - design system
+   ---------------------------------------------------------------------------
+   Two layers, per HIG > Liquid Glass:
+
+     FUNCTIONAL layer  - tab bar, nav bar, floating actions, sheets, overlay
+                         chips. These get the Liquid Glass material.
+     CONTENT layer     - stat cards, charts, leaderboard rows. These stay
+                         SOLID. This is a data app; nothing you read a number
+                         off ever sits on translucency.
+
+   Every colour pair below was checked against its actual rendered backdrop,
+   not an idealised white. See scripts/check-contrast.mjs.
+   ========================================================================= */
+
+/* ---------- tokens: light ------------------------------------------------ */
+:root {
+  color-scheme: light;
+
+  /* ground - near-white, not #FFF, so solid white cards read as raised */
+  --ground: #f2f2f7;
+  --ground-wash-a: rgba(0, 122, 255, 0.10);
+  --ground-wash-b: rgba(94, 92, 230, 0.07);
+
+  /* content surfaces - fully opaque, always */
+  --surface: #ffffff;
+  --surface-2: #f5f5f8;
+  --surface-3: #ebebf0;
+  --separator: rgba(60, 60, 67, 0.14);
+  --separator-strong: #d6d6dc;
+
+  /* labels - HIG semantic hierarchy. Quaternary is deliberately absent:
+     it cannot hit AA and this app has no text that unimportant. */
+  --label: #1c1c1e;        /* 16.1:1 on --surface */
+  --label-2: #55555c;      /*  7.4:1 on --surface,  6.5:1 on --ground */
+  --label-3: #6b6b73;      /*  5.2:1 on --surface,  4.6:1 on --ground */
+
+  /* the one accent. Two values because the contrast bar differs:
+     --accent is a graphic fill (needs 3:1), --accent-text is text (needs 4.5:1) */
+  --accent: #007aff;
+  --accent-text: #0062cc;
+  --accent-soft: rgba(0, 122, 255, 0.12);
+  --accent-softer: rgba(0, 122, 255, 0.06);
+
+  /* semantic. Always paired with a glyph or numeral - never colour alone. */
+  --pos: #17803d;
+  --pos-fill: #30d158;
+  --neg: #c0271f;
+  --neg-fill: #ff453a;
+
+  /* chart ramp - four steps of the single accent plus an empty state.
+     Not a rainbow. */
+  --ramp-0: #e9e9ef;
+  --ramp-1: rgba(0, 122, 255, 0.42);
+  --ramp-2: rgba(0, 122, 255, 0.62);
+  --ramp-3: rgba(0, 122, 255, 0.80);
+  --ramp-4: rgba(0, 122, 255, 0.97);
+
+  /* --- Liquid Glass: the three layers ---------------------------------- */
+  /* 3. illumination - the translucent body itself */
+  --glass-tint: rgba(255, 255, 255, 0.80);
+  --glass-filter: blur(30px) saturate(180%);
+  /* 1. highlight - light casting along the lit (top) edge */
+  --glass-rim: rgba(255, 255, 255, 0.92);
+  --glass-edge: rgba(0, 0, 0, 0.055);
+  --glass-lit: rgba(255, 255, 255, 0.42);
+  /* 2. shadow - depth separation from what is behind */
+  --glass-shadow: 0 10px 34px rgba(0, 0, 0, 0.10), 0 2px 8px rgba(0, 0, 0, 0.05);
+  /* opaque stand-in for reduced-transparency / no backdrop-filter */
+  --chrome-solid: #fbfbfd;
+
+  /* --- shape ------------------------------------------------------------ */
+  --r-glass: 28px;
+  --r-card: 22px;
+  --r-inner: 14px;
+  --r-chip: 11px;
+  --r-pill: 999px;
+
+  --gutter: 16px;
+  --card-shadow: 0 1px 2px rgba(0, 0, 0, 0.05), 0 6px 20px rgba(0, 0, 0, 0.045);
+
+  /* --- type ------------------------------------------------------------- */
+  --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto,
+    Helvetica, Arial, system-ui, sans-serif;
+  --font-rounded: ui-rounded, "SF Pro Rounded", "Hiragino Maru Gothic ProN",
+    var(--font);
+
+  /* --- safe areas ------------------------------------------------------- */
+  --safe-t: env(safe-area-inset-top, 0px);
+  --safe-b: env(safe-area-inset-bottom, 0px);
+  --safe-l: env(safe-area-inset-left, 0px);
+  --safe-r: env(safe-area-inset-right, 0px);
+
+  --tabbar-h: 58px;
+  --navbar-h: 48px;
+}
+
+/* ---------- tokens: dark ------------------------------------------------- */
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+
+    --ground: #000000;
+    --ground-wash-a: rgba(10, 132, 255, 0.16);
+    --ground-wash-b: rgba(94, 92, 230, 0.12);
+
+    --surface: #1c1c1e;
+    --surface-2: #2c2c2e;
+    --surface-3: #3a3a3c;
+    --separator: rgba(84, 84, 88, 0.55);
+    --separator-strong: #38383a;
+
+    --label: #ffffff;        /* 15.8:1 on --surface */
+    --label-2: #b4b4bc;      /*  8.6:1 on --surface */
+    --label-3: #95959e;      /*  5.9:1 on --surface */
+
+    --accent: #0a84ff;
+    --accent-text: #6cb8ff;
+    --accent-soft: rgba(10, 132, 255, 0.20);
+    --accent-softer: rgba(10, 132, 255, 0.10);
+
+    --pos: #5bd98a;
+    --pos-fill: #30d158;
+    --neg: #ff7a70;
+    --neg-fill: #ff453a;
+
+    --ramp-0: #2a2a2e;
+    --ramp-1: rgba(10, 132, 255, 0.40);
+    --ramp-2: rgba(10, 132, 255, 0.60);
+    --ramp-3: rgba(10, 132, 255, 0.80);
+    --ramp-4: rgba(10, 132, 255, 1);
+
+    /* glass on dark takes a DARK tint - never a light one */
+    --glass-tint: rgba(28, 28, 32, 0.76);
+    --glass-filter: blur(30px) saturate(170%);
+    --glass-rim: rgba(255, 255, 255, 0.18);
+    --glass-edge: rgba(255, 255, 255, 0.07);
+    --glass-lit: rgba(255, 255, 255, 0.06);
+    --glass-shadow: 0 10px 34px rgba(0, 0, 0, 0.5), 0 2px 10px rgba(0, 0, 0, 0.4);
+    --chrome-solid: #1a1a1e;
+
+    --card-shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 6px 20px rgba(0, 0, 0, 0.28);
+  }
+}
+
+/* ---------- base --------------------------------------------------------- */
+* { box-sizing: border-box; }
+
+html {
+  -webkit-text-size-adjust: 100%;
+  /* keep the ground colour behind the notch and under the home bar */
+  background: var(--ground);
+}
+
+body {
+  margin: 0;
+  min-height: 100svh;
+  font-family: var(--font);
+  font-size: 17px;
+  line-height: 1.35;
+  color: var(--label);
+  background: var(--ground);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  /* iOS: no rubber-band overscroll behind the fixed chrome */
+  overscroll-behavior-y: none;
+}
+
+/* A soft ground wash. This exists so the glass has colour to pick up - the
+   material reads as dead flat over a uniform fill. It sits behind everything
+   and never behind a number. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(120% 60% at 8% -6%, var(--ground-wash-a) 0%, transparent 62%),
+    radial-gradient(110% 55% at 100% 4%, var(--ground-wash-b) 0%, transparent 58%);
+}
+
+a { color: var(--accent-text); text-decoration: none; }
+
+button {
+  font: inherit;
+  color: inherit;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+:focus-visible {
+  outline: 2.5px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* continuous (squircle) curvature where the browser can do it */
+@supports (corner-shape: squircle) {
+  .glass, .card, .chip, .badge-tile, .tabbar { corner-shape: squircle; }
+}
+
+/* ---------- type scale (iOS) -------------------------------------------- */
+.t-large-title { font-size: 34px; line-height: 41px; font-weight: 700; letter-spacing: 0.37px; }
+.t-title1      { font-size: 28px; line-height: 34px; font-weight: 700; letter-spacing: 0.36px; }
+.t-title2      { font-size: 22px; line-height: 28px; font-weight: 700; letter-spacing: 0.35px; }
+.t-title3      { font-size: 20px; line-height: 25px; font-weight: 600; letter-spacing: 0.38px; }
+.t-headline    { font-size: 17px; line-height: 22px; font-weight: 600; letter-spacing: -0.41px; }
+.t-body        { font-size: 17px; line-height: 22px; font-weight: 400; letter-spacing: -0.41px; }
+.t-callout     { font-size: 16px; line-height: 21px; font-weight: 400; letter-spacing: -0.32px; }
+.t-subhead     { font-size: 15px; line-height: 20px; font-weight: 400; letter-spacing: -0.24px; }
+.t-footnote    { font-size: 13px; line-height: 18px; font-weight: 400; letter-spacing: -0.08px; }
+.t-caption     { font-size: 12px; line-height: 16px; font-weight: 400; letter-spacing: 0; }
+.t-caption2    { font-size: 11px; line-height: 14px; font-weight: 500; letter-spacing: 0.06px; }
+
+.dim   { color: var(--label-2); }
+.dimmer{ color: var(--label-3); }
+.num   { font-family: var(--font-rounded); font-variant-numeric: tabular-nums; font-feature-settings: "tnum" 1; }
+
+/* section heading above a group of cards - iOS grouped-list convention */
+.section-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 26px 4px 10px;
+  color: var(--label-2);
+}
+/* A link in a section header still needs a 44pt target, without letting that
+   target's height disturb the header's vertical rhythm. */
+.section-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 4px;
+  margin: -13px -4px;
+  color: var(--accent-text);
+  font-size: 13px;
+  line-height: 18px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.section-head h2 {
+  margin: 0;
+  font-size: 15px;
+  line-height: 20px;
+  font-weight: 600;
+  letter-spacing: -0.24px;
+  color: var(--label);
+}
+
+/* =========================================================================
+   LIQUID GLASS - functional layer only
+   Three layers, per the material spec:
+     body        .glass       background tint + backdrop blur + saturate
+     illumination .glass::before  top-lit gradient through the body
+     highlight   .glass::after   1px specular rim on the lit edge
+     shadow      box-shadow on .glass
+   ========================================================================= */
+.glass {
+  position: relative;
+  border-radius: var(--r-glass);
+  background: var(--glass-tint);
+  -webkit-backdrop-filter: var(--glass-filter);
+  backdrop-filter: var(--glass-filter);
+  box-shadow: var(--glass-shadow);
+}
+
+/* illumination */
+.glass::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(
+    180deg,
+    var(--glass-lit) 0%,
+    transparent 46%,
+    transparent 100%
+  );
+}
+
+/* specular highlight: bright 1px along the top edge, hairline all round */
+.glass::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  box-shadow:
+    inset 0 1px 0 0 var(--glass-rim),
+    inset 0 0 0 0.5px var(--glass-edge);
+}
+
+/* content must sit above both pseudo-layers */
+.glass > * { position: relative; }
+
+/* Optional lensing: a decorative rim element warped by an SVG displacement
+   map, so light appears to bend at the glass edge. Applied with `filter`, not
+   `backdrop-filter`, so an unsupported filter can never take the whole glass
+   effect down with it on Safari. */
+.glass-lens {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: 0.6;
+  filter: url("#xtr-lens");
+  background: linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.55) 0%,
+      transparent 14%,
+      transparent 86%,
+      rgba(255, 255, 255, 0.16) 100%
+    );
+  -webkit-mask: linear-gradient(#000 0 0) content-box exclude,
+    linear-gradient(#000 0 0);
+  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+  padding: 2.5px;
+}
+@media (prefers-color-scheme: dark) {
+  .glass-lens { opacity: 0.35; }
+}
+
+/* =========================================================================
+   CONTENT LAYER - solid, always. No translucency behind a value.
+   ========================================================================= */
+.card {
+  background: var(--surface);
+  border-radius: var(--r-card);
+  box-shadow: var(--card-shadow);
+  padding: 18px;
+}
+.card-tight { padding: 14px 16px; }
+.card-flush { padding: 0; overflow: hidden; }
+
+.stat-value {
+  font-family: var(--font-rounded);
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+  color: var(--label);
+  line-height: 1;
+}
+.stat-label {
+  font-size: 13px;
+  line-height: 18px;
+  font-weight: 500;
+  color: var(--label-2);
+}
+.stat-unit {
+  font-family: var(--font-rounded);
+  font-weight: 600;
+  color: var(--label-3);
+}
+
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.row { display: flex; align-items: center; gap: 12px; }
+.spread { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.stack { display: flex; flex-direction: column; }
+
+/* small overlay chips - these ARE functional layer, so they may be glass */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
+  border-radius: var(--r-chip);
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 600;
+  letter-spacing: -0.05px;
+  white-space: nowrap;
+}
+.chip-accent { background: var(--accent-soft); color: var(--accent-text); }
+.chip-pos    { background: color-mix(in srgb, var(--pos) 14%, transparent); color: var(--pos); }
+.chip-neutral{ background: var(--surface-2); color: var(--label-2); }
+
+/* =========================================================================
+   Motion. Purposeful and brief, per HIG > Motion. Everything here is a
+   one-shot entrance or a press response - nothing loops, nothing decorative.
+   ========================================================================= */
+@keyframes rise {
+  from { opacity: 0; transform: translate3d(0, 10px, 0); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes grow-bar {
+  from { transform: scaleY(0.02); }
+  to   { transform: scaleY(1); }
+}
+.rise { animation: rise 0.42s cubic-bezier(0.22, 0.9, 0.28, 1) both; }
+
+.pressable {
+  transition: transform 0.18s cubic-bezier(0.22, 0.9, 0.28, 1),
+    background-color 0.18s ease;
+}
+.pressable:active { transform: scale(0.975); }
+
+/* =========================================================================
+   ACCESSIBILITY OVERRIDES
+   ========================================================================= */
+
+/* 1. Reduced transparency: drop the blur, go solid. Non-negotiable. */
+@media (prefers-reduced-transparency: reduce) {
+  .glass {
+    background: var(--chrome-solid);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    border: 0.5px solid var(--separator-strong);
+  }
+  .glass::before { background: none; }
+  .glass::after { box-shadow: none; }
+  .glass-lens { display: none; }
+  body::before { display: none; }
+}
+
+/* 2. No backdrop-filter support: solid, not unreadably transparent. */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .glass {
+    background: var(--chrome-solid);
+    border: 0.5px solid var(--separator-strong);
+  }
+  .glass::before { background: none; }
+  .glass-lens { display: none; }
+}
+
+/* 3. Reduced motion. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+  .pressable:active { transform: none; }
+}
+
+/* 4. Increased contrast: the HIG asks for a significantly higher amount of
+      visual differentiation, not a token nudge. */
+@media (prefers-contrast: more) {
+  :root {
+    --label-2: #3a3a40;
+    --label-3: #46464c;
+    --separator: rgba(60, 60, 67, 0.4);
+    --glass-tint: rgba(255, 255, 255, 0.93);
+    --accent-text: #0050a8;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --label-2: #e0e0e6;
+      --label-3: #cfcfd6;
+      --separator: rgba(140, 140, 148, 0.7);
+      --glass-tint: rgba(22, 22, 26, 0.95);
+      --accent-text: #8fcaff;
+    }
+  }
+}
+
+/* =========================================================================
+   APP CHROME - the functional layer
+   ========================================================================= */
+
+.app {
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* --- top nav bar: glass, with the iOS scroll-edge effect ---------------- */
+.navbar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 40;
+  padding-top: var(--safe-t);
+  border-radius: 0;
+  /* At the top of the scroll there is nothing to separate from, so the bar is
+     invisible - the "scroll edge effect" from HIG > Liquid Glass. It fades in
+     as content passes under it. */
+  background: transparent;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  box-shadow: none;
+  transition: background-color 0.24s ease, backdrop-filter 0.24s ease,
+    box-shadow 0.24s ease;
+}
+.navbar::before,
+.navbar::after { opacity: 0; transition: opacity 0.24s ease; }
+
+.navbar[data-stuck="true"] {
+  background: var(--glass-tint);
+  -webkit-backdrop-filter: var(--glass-filter);
+  backdrop-filter: var(--glass-filter);
+  box-shadow: 0 1px 0 0 var(--glass-edge), 0 6px 22px rgba(0, 0, 0, 0.06);
+}
+.navbar[data-stuck="true"]::after { opacity: 1; box-shadow: inset 0 1px 0 0 var(--glass-rim); }
+
+.navbar__inner {
+  height: var(--navbar-h);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 calc(var(--gutter) + var(--safe-l)) 0 calc(var(--gutter) + var(--safe-r));
+}
+.navbar__title {
+  flex: 1;
+  text-align: center;
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.41px;
+  color: var(--label);
+  opacity: 0;
+  transform: translateY(4px);
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+.navbar[data-stuck="true"] .navbar__title { opacity: 1; transform: none; }
+
+.navbar__back {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+  /* 44pt minimum touch target, per the accessibility bar */
+  min-width: 44px;
+  min-height: 44px;
+  margin-left: -8px;
+  padding-right: 6px;
+  color: var(--accent-text);
+  font-size: 17px;
+  letter-spacing: -0.41px;
+}
+.navbar__spacer { min-width: 44px; }
+
+/* --- scrollable content ------------------------------------------------- */
+.screen {
+  flex: 1;
+  padding: calc(var(--safe-t) + var(--navbar-h) + 4px)
+    calc(var(--gutter) + var(--safe-r))
+    /* clear the floating tab bar AND the iOS home indicator */
+    calc(var(--safe-b) + 10px + var(--tabbar-h) + 22px)
+    calc(var(--gutter) + var(--safe-l));
+  max-width: 640px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+.screen__title {
+  margin: 6px 4px 4px;
+  font-size: 34px;
+  line-height: 41px;
+  font-weight: 700;
+  letter-spacing: 0.37px;
+  color: var(--label);
+}
+.screen__subtitle { margin: 0 4px 18px; color: var(--label-2); }
+
+/* --- bottom tab bar: floating glass, content scrolls behind it ---------- */
+.tabbar {
+  position: fixed;
+  z-index: 40;
+  left: calc(var(--gutter) + var(--safe-l) - 2px);
+  right: calc(var(--gutter) + var(--safe-r) - 2px);
+  /* sits above the iOS home indicator */
+  bottom: calc(var(--safe-b) + 10px);
+  height: var(--tabbar-h);
+  max-width: 560px;
+  margin: 0 auto;
+  border-radius: var(--r-pill);
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  align-items: stretch;
+}
+@supports (corner-shape: squircle) {
+  .tabbar { corner-shape: normal; } /* a pill is already continuous */
+}
+
+.tab {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  /* the whole cell is the target, comfortably over 44pt */
+  min-height: var(--tabbar-h);
+  color: var(--label-3);
+  text-decoration: none;
+  border-radius: var(--r-pill);
+  transition: color 0.18s ease;
+}
+.tab__label {
+  font-size: 10.5px;
+  line-height: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02px;
+}
+/* Selected state is carried by colour AND a filled glyph AND a background
+   pill - never by colour alone. */
+.tab[aria-current="page"] { color: var(--accent-text); }
+.tab[aria-current="page"]::before {
+  content: "";
+  position: absolute;
+  inset: 6px 8px;
+  border-radius: var(--r-pill);
+  background: var(--accent-soft);
+}
+.tab > * { position: relative; }
+
+/* =========================================================================
+   CHARTS - content layer, so solid backgrounds and opaque axis labels
+   ========================================================================= */
+.weekchart {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 8px;
+  align-items: end;
+}
+.weekchart__col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+.weekchart__track {
+  width: 100%;
+  height: 104px;
+  display: flex;
+  align-items: flex-end;
+  border-radius: 8px;
+  background: var(--surface-2);
+  overflow: hidden;
+}
+.weekchart__bar {
+  width: 100%;
+  border-radius: 8px 8px 5px 5px;
+  background: var(--accent);
+  transform-origin: bottom;
+  animation: grow-bar 0.55s cubic-bezier(0.22, 0.9, 0.28, 1) both;
+  min-height: 3px;
+}
+.weekchart__bar--today { background: var(--accent); }
+.weekchart__bar--empty { background: var(--ramp-0); }
+.weekchart__day {
+  font-size: 11px;
+  line-height: 14px;
+  font-weight: 600;
+  color: var(--label-3);
+}
+.weekchart__col--today .weekchart__day { color: var(--accent-text); }
+.weekchart__col--future { opacity: 0.45; }
+.weekchart__val {
+  font-family: var(--font-rounded);
+  font-variant-numeric: tabular-nums;
+  font-size: 11px;
+  line-height: 14px;
+  font-weight: 600;
+  color: var(--label-2);
+}
+
+/* activity heatmap */
+.heat-scroll {
+  overflow-x: auto;
+  padding-bottom: 2px;
+  -webkit-overflow-scrolling: touch;
+}
+.heat-months {
+  display: grid;
+  gap: 3px;
+  margin-bottom: 5px;
+  font-size: 10px;
+  line-height: 12px;
+  font-weight: 600;
+  color: var(--label-3);
+}
+.heat-months span { grid-row: 1; white-space: nowrap; }
+.heat {
+  display: grid;
+  grid-auto-flow: column;
+  grid-template-rows: repeat(7, 1fr);
+  gap: 3px;
+}
+.heat__cell {
+  width: 13px;
+  height: 13px;
+  border-radius: 3.5px;
+  background: var(--ramp-0);
+}
+/* "no activity" is distinguished by an inset ring as well as by tone, so the
+   scale never depends on colour discrimination alone */
+.heat__cell[data-level="0"] { box-shadow: inset 0 0 0 1px var(--separator); }
+.heat__cell[data-level="1"] { background: var(--ramp-1); }
+.heat__cell[data-level="2"] { background: var(--ramp-2); }
+.heat__cell[data-level="3"] { background: var(--ramp-3); }
+.heat__cell[data-level="4"] { background: var(--ramp-4); }
+
+.heat-legend { display: flex; align-items: center; gap: 5px; }
+.heat-legend .heat__cell { width: 11px; height: 11px; }
+
+/* =========================================================================
+   ROWS - leaderboard, session list. Solid surfaces.
+   ========================================================================= */
+.rows { background: var(--surface); border-radius: var(--r-card); box-shadow: var(--card-shadow); overflow: hidden; }
+.rowitem {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 13px 16px;
+  min-height: 60px;
+  text-align: left;
+  color: inherit;
+  text-decoration: none;
+  background: var(--surface);
+  border-bottom: 0.5px solid var(--separator);
+}
+.rowitem:last-child { border-bottom: 0; }
+.rowitem--me {
+  background: var(--accent-softer);
+  box-shadow: inset 3px 0 0 0 var(--accent);
+}
+.rowitem--me .rowitem__name { color: var(--accent-text); font-weight: 700; }
+
+.rowitem__rank {
+  width: 24px;
+  flex: none;
+  text-align: center;
+  font-family: var(--font-rounded);
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  font-size: 16px;
+  color: var(--label-3);
+}
+.avatar {
+  width: 38px;
+  height: 38px;
+  flex: none;
+  border-radius: var(--r-pill);
+  display: grid;
+  place-items: center;
+  background: var(--surface-3);
+  color: var(--label-2);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+}
+.avatar--me { background: var(--accent); color: #fff; }
+.rowitem__name { font-size: 16px; font-weight: 600; letter-spacing: -0.32px; color: var(--label); }
+.rowitem__meta { font-size: 12.5px; line-height: 16px; color: var(--label-2); }
+.rowitem__grow { flex: 1; min-width: 0; }
+.rowitem__value {
+  font-family: var(--font-rounded);
+  font-variant-numeric: tabular-nums;
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--label);
+  text-align: right;
+}
+
+/* movement indicator: arrow + number + colour, three signals for one fact */
+.move {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+  font-family: var(--font-rounded);
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+  font-weight: 700;
+}
+.move--up { color: var(--pos); }
+.move--down { color: var(--neg); }
+.move--same { color: var(--label-3); }
+
+/* =========================================================================
+   BADGES
+   ========================================================================= */
+.badge-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.badge-tile {
+  background: var(--surface);
+  border-radius: var(--r-card);
+  box-shadow: var(--card-shadow);
+  padding: 14px 8px 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 7px;
+  text-align: center;
+  min-height: 116px;
+}
+.badge-tile__disc {
+  width: 46px;
+  height: 46px;
+  border-radius: var(--r-pill);
+  display: grid;
+  place-items: center;
+  background: var(--accent);
+  color: #fff;
+}
+.badge-tile--locked .badge-tile__disc { background: var(--surface-3); color: var(--label-3); }
+.badge-tile--locked .badge-tile__name { color: var(--label-2); }
+.badge-tile__name { font-size: 12px; line-height: 15px; font-weight: 600; color: var(--label); }
+.badge-tile__sub { font-size: 10.5px; line-height: 13px; color: var(--label-3); }
+
+/* =========================================================================
+   MISC
+   ========================================================================= */
+.hero-streak {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.hero-streak__disc {
+  width: 62px;
+  height: 62px;
+  flex: none;
+  border-radius: var(--r-pill);
+  display: grid;
+  place-items: center;
+  background: var(--accent);
+  color: #fff;
+}
+.divider { height: 0.5px; background: var(--separator); margin: 14px -18px; }
+.vdivider { width: 0.5px; align-self: stretch; background: var(--separator); }
+
+.kv { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 9px 0; }
+.kv + .kv { border-top: 0.5px solid var(--separator); }
+.kv__k { font-size: 15px; color: var(--label-2); }
+.kv__v { font-family: var(--font-rounded); font-variant-numeric: tabular-nums; font-size: 16px; font-weight: 600; color: var(--label); }
+
+.deltabar {
+  height: 8px;
+  border-radius: 4px;
+  background: var(--surface-3);
+  overflow: hidden;
+  display: flex;
+}
+.deltabar__raw { background: var(--accent); }
+.deltabar__lead { background: var(--accent-soft); }
