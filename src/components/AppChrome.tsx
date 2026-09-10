@@ -4,17 +4,21 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Icon } from "./Icon";
-import { SESSIONS, LEAGUE } from "@/lib/fixtures";
-import { dayLabel } from "@/lib/format";
+import { LEAGUE } from "@/lib/fixtures";
+import { useNavTitle } from "./NavTitle";
 
-type Chrome = { title: string; back?: { href: string; label: string } };
+type Chrome = { title: string | null; back?: { href: string; label: string } };
 
 /**
  * The nav bar lives in the layout rather than in each page, so that the page
  * transition can own a transform without capturing this fixed element into its
- * containing block. Titles are derived from the path.
+ * containing block. Titles are derived from the path for the four tab
+ * routes (all fixed, known without fetching anything) - session detail's
+ * title is the one dynamic case, and comes from `useNavTitle()` instead
+ * (see NavTitle.tsx), since it now depends on a real session pulled from
+ * the database rather than a fixture lookup this component could do itself.
  */
-function chromeFor(path: string): Chrome {
+function chromeFor(path: string, navTitle: string | null): Chrome {
   if (path === "/") return { title: "Today" };
   if (path === "/sessions") return { title: "Sessions" };
   if (path === "/league") return { title: LEAGUE.name };
@@ -22,9 +26,8 @@ function chromeFor(path: string): Chrome {
 
   const m = path.match(/^\/sessions\/([^/]+)$/);
   if (m) {
-    const session = SESSIONS.find((s) => s.id === m[1]);
     return {
-      title: session ? dayLabel(session.date) : "Session",
+      title: navTitle ?? "Session",
       back: { href: "/sessions/", label: "Sessions" },
     };
   }
@@ -34,7 +37,8 @@ function chromeFor(path: string): Chrome {
 export function AppChrome() {
   const raw = usePathname() || "/";
   const path = raw.length > 1 ? raw.replace(/\/+$/, "") || "/" : raw;
-  const { title, back } = chromeFor(path);
+  const navTitle = useNavTitle();
+  const { title, back } = chromeFor(path, navTitle);
 
   const [stuck, setStuck] = useState(false);
   useEffect(() => {

@@ -1,4 +1,4 @@
-import { DAILY } from "@/lib/fixtures";
+import type { DayTotal } from "@/lib/fixtures";
 import { durationSpoken, monthLabel, shortDate } from "@/lib/format";
 
 /**
@@ -26,12 +26,12 @@ function level(minutes: number): 0 | 1 | 2 | 3 | 4 {
   return l as 0 | 1 | 2 | 3 | 4;
 }
 
-export function ActivityHeatmap() {
+export function ActivityHeatmap({ daily }: { daily: DayTotal[] }) {
   // Pad the front so the first column starts on a Monday.
-  const first = new Date(Date.parse(`${DAILY[0].date}T00:00:00Z`));
+  const first = new Date(Date.parse(`${daily[0].date}T00:00:00Z`));
   const lead = (first.getUTCDay() + 6) % 7;
   const cells: ({ date: string; scoredMinutes: number } | null)[] =
-    [...Array(lead).fill(null), ...DAILY];
+    [...Array(lead).fill(null), ...daily];
 
   // Month ticks: label a column when its first day starts a new month.
   const months: { col: number; label: string }[] = [];
@@ -68,9 +68,9 @@ export function ActivityHeatmap() {
           style={cols}
           role="img"
           aria-label={
-            `Daily modeled time over the last ${DAILY.length} days. ` +
-            `${DAILY.filter((d) => d.sessions > 0).length} active days, ` +
-            `${Math.round(DAILY.reduce((a, d) => a + d.scoredMinutes, 0) / 60)} hours total.`
+            `Daily modeled time over the last ${daily.length} days. ` +
+            `${daily.filter((d) => d.sessions > 0).length} active days, ` +
+            `${Math.round(daily.reduce((a, d) => a + d.scoredMinutes, 0) / 60)} hours total.`
           }
         >
           {cells.map((c, i) => {
@@ -93,7 +93,7 @@ export function ActivityHeatmap() {
 
       <div className="spread" style={{ marginTop: 12 }}>
         <span className="t-caption2" style={{ color: "rgba(23,23,26,0.55)" }}>
-          {shortDate(DAILY[0].date)} &ndash; {shortDate(DAILY[DAILY.length - 1].date)}
+          {shortDate(daily[0].date)} &ndash; {shortDate(daily[daily.length - 1].date)}
         </span>
         <div className="heat-legend">
           <span className="t-caption2" style={{ color: "rgba(23,23,26,0.55)" }}>Less</span>

@@ -1,21 +1,28 @@
-import { TODAY } from "./fixtures";
-
 /**
- * All date maths is done against the TODAY constant, never Date.now(). The
- * shell is statically exported, so a clock-dependent render would drift out of
- * sync with the prerendered HTML the moment the day rolled over.
+ * Phase 0.5 anchored all date maths to a frozen TODAY fixture constant,
+ * because the shell was statically exported and a clock-dependent render
+ * would drift out of sync with the prerendered HTML the moment the day
+ * rolled over. Phase 1 has a real server rendering these on every request
+ * (see the `force-dynamic` pages), so "today" is the real clock now - the
+ * original problem this was working around no longer exists. `todayMs()`
+ * reads the clock fresh on every call rather than once at module load,
+ * since a long-running server process could otherwise freeze "today" at
+ * whatever moment it happened to first import this module.
  */
 
 const DAY_MS = 86400000;
 const ms = (isoDate: string) => Date.parse(`${isoDate}T00:00:00Z`);
-const TODAY_MS = ms(TODAY);
+function todayMs(): number {
+  const now = new Date();
+  return Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+}
 
 const WEEKDAY = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const MONTH = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
                "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 export function daysAgo(isoDate: string): number {
-  return Math.round((TODAY_MS - ms(isoDate)) / DAY_MS);
+  return Math.round((todayMs() - ms(isoDate)) / DAY_MS);
 }
 
 /** "Today" / "Yesterday" / "Mon 7 Sep" */

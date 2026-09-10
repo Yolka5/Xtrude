@@ -11,34 +11,56 @@ does. 73.5% of gaps between consecutive events are under 30 seconds, which
 means Onshape records granular edits rather than coarse checkpoints, and the
 session-reconstruction model holds.
 
-**Phase 0.5 — this app.** A static visual shell of the product, deployable to
-Vercel and installable to a phone home screen. Every number on screen is a
-constant. There is no backend, no database, no auth, and no Onshape
-integration. The point is to look at the design on a real phone before
-building the real thing.
+**Phase 0.5 — done.** A static visual shell of the product, every number a
+constant, no backend at all - the point was to see the design on a real phone
+before building the real thing.
+
+**Phase 1 — this app.** Real Onshape history, single-user, backfill-only. The
+app is a live Next.js server now (not a static export), backed by Supabase.
+`scripts/backfill.mjs` pulls your real `documenthistory` into an append-only
+`events` table under a strict API-call budget (free/EDU Onshape accounts get
+2,500 calls/year); `scripts/recompute-sessions.mjs` derives `sessions` and
+`daily_stats` from it with the exact clustering algorithm `phase0_validate.py`
+validated. Today, Sessions and Profile read that real data. League is still
+fixtures (a leaderboard needs other people, which is Phase 2) marked with a
+visible "Example data" chip so it never reads as a real ranking. There is no
+geometry verification yet (see "The design" below for why) and no live
+updates - a backfill is a one-time pull, webhooks are Phase 1b.
 
 ## What is deliberately not here
 
-- No Onshape API calls. `phase0_validate.py` is untouched.
-- No Supabase or any database.
-- No authentication.
-- No scoring logic. The scoring *parameters* are mirrored into the fixtures so
-  the numbers are internally consistent, but nothing computes a score at
-  runtime.
+- No user accounts, OAuth, or login - single-user, authenticated with an
+  Onshape API key and a Supabase service-role key, both server-only.
+- No other users, and no real league - Phase 2.
+- No profile editing.
+- No geometry verification - would cost ~2 Onshape API calls per session,
+  unaffordable against the 2,500/year budget. Every session is honestly
+  unverified rather than showing a fabricated checkmark.
+- No live updates. The backfill is a deliberate one-time pull; webhooks for
+  live sync are Phase 1b, not this phase.
 
 ## Running it
 
+One-time setup: copy `.env.example` to `.env` and fill in an Onshape API key
+pair (from `dev-portal.onshape.com/keys`) and a Supabase project's URL +
+service-role key. No Supabase project yet? `supabase/README.md` walks through
+creating one and running `supabase/schema.sql`.
+
 ```bash
 npm install
-npm run dev            # http://localhost:3000
-npm run build          # static export to out/
-npm start              # serve the built output
+npm run backfill -- --dry-run   # lists your Onshape documents, spends ~2 calls
+npm run backfill                # the real pull - see "Quota discipline" below
+npm run recompute-sessions      # derives sessions + daily_stats from events
+npm run dev                     # http://localhost:3000
+npm run build
+npm start                       # serve the built app (next start, not a static export)
 ```
 
 Supporting scripts:
 
 ```bash
-npm run fixtures       # regenerate src/lib/fixtures.ts
+npm run verify         # regression check on the streak/records/badge math (no DB needed)
+npm run fixtures       # regenerate src/lib/fixtures.ts (League still runs on this)
 npm run icons          # regenerate the PWA icons
 npm run contrast       # WCAG check on the design tokens
 ```

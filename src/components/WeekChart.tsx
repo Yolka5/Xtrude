@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "motion/react";
-import { WEEK } from "@/lib/fixtures";
+import type { WeekDay } from "@/lib/fixtures";
 import { duration, durationSpoken } from "@/lib/format";
 
 /**
@@ -25,8 +25,8 @@ const GROW_Y = [0, 1.22, 0.86, 1.05, 1];
 const GROW_X = [1, 0.94, 1.14, 0.97, 1];
 const GROW_TIMES = [0, 0.42, 0.62, 0.82, 1];
 
-export function WeekChart() {
-  const max = Math.max(...WEEK.map((d) => d.scoredMinutes));
+export function WeekChart({ week }: { week: WeekDay[] }) {
+  const max = Math.max(0, ...week.map((d) => d.scoredMinutes));
   const peak = Math.max(FLOOR, Math.ceil(max / STEP) * STEP);
 
   return (
@@ -35,12 +35,13 @@ export function WeekChart() {
       role="img"
       aria-label={
         "Modeled time this week: " +
-        WEEK.filter((d) => !d.isFuture)
+        week
+          .filter((d) => !d.isFuture)
           .map((d) => `${d.label} ${d.scoredMinutes ? durationSpoken(d.scoredMinutes) : "nothing"}`)
           .join(", ")
       }
     >
-      {WEEK.map((d, i) => {
+      {week.map((d, i) => {
         const pct = d.scoredMinutes === 0 ? 0 : Math.max(7, (d.scoredMinutes / peak) * 100);
         return (
           <div

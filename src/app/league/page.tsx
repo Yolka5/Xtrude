@@ -35,7 +35,16 @@ export default function LeagueScreen() {
   return (
     <main className="screen">
       <FlyItem>
-        <h1 className="screen__title">{LEAGUE.name}</h1>
+        <div className="row" style={{ gap: 8, alignItems: "center" }}>
+          <h1 className="screen__title">{LEAGUE.name}</h1>
+          {/* Phase 1 is single-user - a league needs other people, which is
+              Phase 2. Fixtures stand in so the screen isn't blank, marked
+              plainly rather than left to look like a real leaderboard. */}
+          <span className="chip chip-neutral" style={{ marginBottom: 6 }}>
+            <Icon name="doc" size={12} />
+            Example data
+          </span>
+        </div>
         <p className="screen__subtitle t-subhead">
           {plural(LEAGUE.memberCount, "member")} &middot; ranked by scored minutes this week
         </p>

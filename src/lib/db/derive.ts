@@ -1,0 +1,281 @@
+/**
+ * Pure derivation: raw `sessions`/`daily_stats` rows in, everything the
+ * Today/Sessions/Profile screens need out. No Supabase import, no
+ * `server-only` - deliberately importable from a plain script (see
+ * scratch-verify.ts) so the actual logic can be checked against synthetic
+ * data, not only ever exercised live against a real project.
+ *
+ * Mirrors the derivations in scripts/gen-fixtures.mjs (current/longest
+ * streak, Monday-anchored week, personal records, badge claims) so
+ * switching from fixtures to real data changes where the numbers come
+ * from, not what they mean.
+ *
+ * One deliberate deviation: gen-fixtures.mjs's "current streak" breaks to 0
+ * the instant TODAY itself has no session yet, which is fine for a frozen
+ * fixture (TODAY was always chosen to already have activity) but would zero
+ * a live user's streak every morning before they've opened Onshape - here,
+ * an empty-so-far today doesn't break the streak, it just isn't counted
+ * yet; the streak only breaks once a day passes with nothing at all.
+ */
+import type {
+  Session,
+  TouchedDocument,
+  DayTotal,
+  WeekDay,
+  TodayStats,
+  StreakStats,
+  ProfileStats,
+  PersonalRecord,
+  Badge,
+} from "@/lib/fixtures";
+
+const DAY_MS = 86_400_000;
+
+function isoDate(ms: number): string {
+  return new Date(ms).toISOString().slice(0, 10);
+}
+function addDaysIso(date: string, days: number): string {
+  return isoDate(Date.parse(`${date}T00:00:00Z`) + days * DAY_MS);
+}
+/** Monday=0 .. Sunday=6, matching gen-fixtures.mjs's convention. */
+function mondayIndexedDow(ms: number): number {
+  return (new Date(ms).getUTCDay() + 6) % 7;
+}
+
+export interface RealData {
+  hasAnyData: boolean;
+  today: string;
+  sessions: Session[]; // newest first
+  daily: DayTotal[]; // dense, oldest first
+  week: WeekDay[];
+  todayStats: TodayStats;
+  streak: StreakStats;
+  profile: ProfileStats;
+  records: PersonalRecord[];
+  badges: Badge[];
+}
+
+export interface RawSessionRow {
+  id: string;
+  started_at: string;
+  ended_at: string;
+  raw_minutes: number;
+  scored_minutes: number;
+  event_count: number;
+  document_ids: string[];
+}
+export interface RawDailyRow {
+  date: string;
+  total_scored_minutes: number;
+  session_count: number;
+}
+
+export function deriveRealData(
+  sessionRows: RawSessionRow[],
+  dailyRows: RawDailyRow[],
+  docNameById: Map<string, string>,
+  todayMs: number
+): RealData {
+  const today = isoDate(todayMs);
+
+  const sessions: Session[] = sessionRows.map((row) => {
+    const start = new Date(row.started_at);
+    const end = new Date(row.ended_at);
+    const documents: TouchedDocument[] = row.document_ids.map((id) => ({
+      name: docNameById.get(id) ?? "Unknown document",
+      // Onshape's documenthistory rows don't carry which tab (Part Studio /
+      // Assembly / Drawing) an edit landed in without an extra API call per
+      // element - not spent, given the quota this backfill runs under. Blank
+      // reads as nothing in the UI rather than a fabricated guess.
+      tab: "",
+      edits: 0,
+    }));
+    return {
+      id: row.id,
+      date: isoDate(start.getTime()),
+      start: start.toISOString().slice(11, 16),
+      end: end.toISOString().slice(11, 16),
+      rawMinutes: Math.round(row.raw_minutes),
+      scoredMinutes: Math.round(row.scored_minutes),
+      leadInMinutes: 5,
+      eventCount: row.event_count,
+      // No geometry verification in Phase 1 (would cost ~2 Onshape calls per
+      // session, unaffordable against the 2,500/year quota) - every real
+      // session is honestly unverified rather than a fabricated checkmark.
+      verified: false,
+      documents,
+    };
+  });
+
+  const hasAnyData = sessions.length > 0;
+
+  // Dense day-by-day series, oldest first, zero-filled gaps - the heatmap
+  // and streak math both need every calendar day present, not just the ones
+  // with a daily_stats row.
+  const dbDaily = new Map(dailyRows.map((d) => [d.date, d]));
+  const firstDate = dailyRows[0]?.date ?? today;
+  const daily: DayTotal[] = [];
+  for (let d = firstDate; d <= today; d = addDaysIso(d, 1)) {
+    const row = dbDaily.get(d);
+    daily.push({
+      date: d,
+      scoredMinutes: row ? Math.round(row.total_scored_minutes) : 0,
+      sessions: row ? row.session_count : 0,
+    });
+  }
+  const byDate = new Map(daily.map((d) => [d.date, d]));
+
+  // --- streak ---------------------------------------------------------------
+  let currentStreak = 0;
+  {
+    const todayActive = (byDate.get(today)?.sessions ?? 0) > 0;
+    let cursor = todayActive ? today : addDaysIso(today, -1);
+    for (;;) {
+      const d = byDate.get(cursor);
+      if (d && d.sessions > 0) {
+        currentStreak++;
+        cursor = addDaysIso(cursor, -1);
+      } else break;
+    }
+  }
+  let longestStreak = 0;
+  {
+    let run = 0;
+    for (const d of daily) {
+      run = d.sessions > 0 ? run + 1 : 0;
+      longestStreak = Math.max(longestStreak, run);
+    }
+  }
+
+  // --- this week, Monday-anchored -------------------------------------------
+  const mondayOffset = mondayIndexedDow(todayMs);
+  const weekStartMs = todayMs - mondayOffset * DAY_MS;
+  const LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+  const week: WeekDay[] = LABELS.map((label, i) => {
+    const ms = weekStartMs + i * DAY_MS;
+    const date = isoDate(ms);
+    const d = byDate.get(date) ?? { date, scoredMinutes: 0, sessions: 0 };
+    return {
+      label,
+      date: d.date,
+      scoredMinutes: d.scoredMinutes,
+      sessions: d.sessions,
+      isToday: d.date === today,
+      isFuture: ms > todayMs,
+    };
+  });
+  const weekMinutes = week.reduce((a, d) => a + d.scoredMinutes, 0);
+
+  const lastWeekMinutes = LABELS.reduce((sum, _label, i) => {
+    const date = isoDate(weekStartMs - 7 * DAY_MS + i * DAY_MS);
+    return sum + (byDate.get(date)?.scoredMinutes ?? 0);
+  }, 0);
+
+  // --- today ------------------------------------------------------------------
+  const todayEntry = byDate.get(today) ?? { date: today, scoredMinutes: 0, sessions: 0 };
+  const todayEvents = sessions.filter((s) => s.date === today).reduce((a, s) => a + s.eventCount, 0);
+  const todayStats: TodayStats = {
+    scoredMinutes: todayEntry.scoredMinutes,
+    sessions: todayEntry.sessions,
+    events: todayEvents,
+  };
+
+  // --- lifetime / profile -----------------------------------------------------
+  const lifetimeMinutes = daily.reduce((a, d) => a + d.scoredMinutes, 0);
+  const activeDays = daily.filter((d) => d.sessions > 0).length;
+  const sortedDurations = sessions.map((s) => s.scoredMinutes).sort((a, b) => a - b);
+  const medianSessionMinutes = sortedDurations.length
+    ? sortedDurations[Math.floor(sortedDurations.length / 2)]
+    : 0;
+
+  // "Since" the earliest tracked activity - there's no account-creation date
+  // to source this from otherwise, single-user with no auth system.
+  const memberSince = hasAnyData
+    ? new Date(`${daily[0].date}T00:00:00Z`).toLocaleDateString("en-US", { month: "long", year: "numeric" })
+    : "-";
+
+  const profile: ProfileStats = {
+    name: "You",
+    handle: "@yoni",
+    initials: "YS",
+    memberSince,
+    lifetimeMinutes,
+    lifetimeHours: Math.round((lifetimeMinutes / 60) * 10) / 10,
+    totalSessions: sessions.length,
+    activeDays,
+    longestStreak,
+    currentStreak,
+    medianSessionMinutes,
+    // Always 0: Phase 1 doesn't verify geometry (see `verified: false` above).
+    // Shown as-is rather than hidden, since it's an honest count of zero
+    // verified sessions, not a fabricated one - flagged for you to reconsider
+    // the label if 0% reads as a claim about your modeling rather than
+    // "not measured yet."
+    verifiedShare: 0,
+  };
+
+  // --- personal records ---------------------------------------------------
+  const records: PersonalRecord[] = [];
+  if (hasAnyData) {
+    const longestSession = sessions.reduce((a, s) => (s.scoredMinutes > a.scoredMinutes ? s : a));
+    const bestDay = daily.reduce((a, d) => (d.scoredMinutes > a.scoredMinutes ? d : a));
+    const busiestDay = daily.reduce((a, d) => (d.sessions > a.sessions ? d : a));
+    const mostEditsSession = sessions.reduce((a, s) => (s.eventCount > a.eventCount ? s : a));
+    let bestWeek = { start: "", minutes: 0 };
+    for (let i = 0; i + 7 <= daily.length; i++) {
+      const slice = daily.slice(i, i + 7);
+      const minutes = slice.reduce((a, d) => a + d.scoredMinutes, 0);
+      if (minutes > bestWeek.minutes) bestWeek = { start: slice[0].date, minutes };
+    }
+    records.push(
+      { label: "Longest session", value: longestSession.scoredMinutes, unit: "min", when: longestSession.date },
+      { label: "Best day", value: bestDay.scoredMinutes, unit: "min", when: bestDay.date },
+      { label: "Best week", value: Math.round((bestWeek.minutes / 60) * 10) / 10, unit: "hrs", when: bestWeek.start },
+      { label: "Most sessions in a day", value: busiestDay.sessions, unit: "", when: busiestDay.date },
+      { label: "Most edits in a session", value: mostEditsSession.eventCount, unit: "", when: mostEditsSession.date },
+      { label: "Longest streak", value: longestStreak, unit: "days", when: "" }
+    );
+  }
+
+  // --- badges ---------------------------------------------------------------
+  // b5 (geometry-verified count) and b9 (finish a week ranked first) can't be
+  // earned honestly in Phase 1 - no verification, and League is still
+  // fixtures - so both are hidden from the grid entirely rather than shown
+  // locked, which would invite "why can I never earn this." b11 ("20
+  // sessions before 8am") needs a real local timezone, which doesn't exist
+  // yet (recompute-sessions.mjs buckets by UTC day - see its header comment)
+  // so a real 8am cutoff can't be trusted either; hidden for the same reason.
+  const maxScored = sessions.length ? Math.max(...sessions.map((s) => s.scoredMinutes)) : 0;
+  let mostDocsInAWeek = 0;
+  for (let i = 0; i + 7 <= daily.length; i++) {
+    const windowDates = new Set(daily.slice(i, i + 7).map((d) => d.date));
+    const docs = new Set<string>();
+    for (const s of sessions) if (windowDates.has(s.date)) for (const d of s.documents) docs.add(d.name);
+    mostDocsInAWeek = Math.max(mostDocsInAWeek, docs.size);
+  }
+  const BADGE_DEFS: { id: string; name: string; detail: string; glyph: string; earned: boolean }[] = [
+    { id: "b1", name: "First Extrude", detail: "Log your first session", glyph: "spark", earned: hasAnyData },
+    { id: "b2", name: "Week One", detail: "7-day streak", glyph: "flame", earned: longestStreak >= 7 },
+    { id: "b3", name: "Fortnight", detail: "14-day streak", glyph: "flame2", earned: longestStreak >= 14 },
+    { id: "b4", name: "Deep Work", detail: "One session over 20 minutes", glyph: "clock", earned: maxScored > 20 },
+    { id: "b6", name: "Fifty Hours", detail: "50 hours modeled", glyph: "hourglass", earned: lifetimeMinutes / 60 >= 50 },
+    { id: "b7", name: "Month Straight", detail: "30-day streak", glyph: "calendar", earned: longestStreak >= 30 },
+    { id: "b8", name: "Marathon", detail: "One session over 2 hours", glyph: "run", earned: maxScored > 120 },
+    { id: "b10", name: "Polymath", detail: "Touch 10 documents in a week", glyph: "layers", earned: mostDocsInAWeek >= 10 },
+    { id: "b12", name: "Century", detail: "100 hours modeled", glyph: "crown", earned: lifetimeMinutes / 60 >= 100 },
+  ];
+  const badges: Badge[] = BADGE_DEFS.map((b) => ({ ...b, earnedOn: null }));
+
+  return {
+    hasAnyData,
+    today,
+    sessions,
+    daily,
+    week,
+    todayStats,
+    streak: { current: currentStreak, longest: longestStreak, weekMinutes, weekDaysElapsed: mondayOffset + 1, lastWeekMinutes },
+    profile,
+    records,
+    badges,
+  };
+}

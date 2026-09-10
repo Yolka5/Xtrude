@@ -4,19 +4,26 @@ import { CountUp } from "@/components/CountUp";
 import { TiltHero } from "@/components/TiltHero";
 import { FlyItem } from "@/components/FlyItem";
 import { Icon } from "@/components/Icon";
-import { SCORING, SESSIONS } from "@/lib/fixtures";
+import { SetNavTitle } from "@/components/NavTitle";
+import { SCORING } from "@/lib/fixtures";
+import { getRealData, getSessionDocuments } from "@/lib/db/queries";
 import { clockTime, dayLabel, duration, durationSpoken, longDate, plural } from "@/lib/format";
 import { docColor } from "@/lib/docColor";
 
-/** Static export: every session page is prerendered from the fixtures. */
-export function generateStaticParams() {
-  return SESSIONS.map((s) => ({ id: s.id }));
-}
+export const dynamic = "force-dynamic";
 
 export default async function SessionDetail({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const session = SESSIONS.find((s) => s.id === id);
-  if (!session) notFound();
+  const { sessions } = await getRealData();
+  const found = sessions.find((s) => s.id === id);
+  if (!found) notFound();
+
+  // The list-level pass fills `documents` with names only (edits: 0
+  // placeholders, see queries.ts) - detail is the one screen that shows a
+  // per-document edit count, so it's worth the one extra query to get it
+  // right here.
+  const documents = await getSessionDocuments(id, found.documents);
+  const session = { ...found, documents };
 
   const rawPct = (session.rawMinutes / session.scoredMinutes) * 100;
 
@@ -33,6 +40,7 @@ export default async function SessionDetail({ params }: { params: Promise<{ id: 
 
   return (
     <main className="screen">
+      <SetNavTitle title={dayLabel(session.date)} />
       <FlyItem>
         <h1 className="screen__title">{dayLabel(session.date)}</h1>
         <p className="screen__subtitle t-subhead">

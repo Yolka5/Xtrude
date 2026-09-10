@@ -1,15 +1,29 @@
+import { NextResponse } from "next/server";
+
+/**
+ * The service worker as a route handler, not a static `public/` file.
+ *
+ * Phase 0.5 stamped a build id into `out/sw.js` as a postbuild step, because
+ * a static export has no server to compute anything at request time. Now
+ * that there is a server, Vercel already gives every deployment a stable id
+ * for free (`VERCEL_GIT_COMMIT_SHA`) - reading it here is simpler than a
+ * separate build step, and it's naturally "dev" with no special-casing when
+ * running locally where that variable isn't set.
+ */
+const VERSION = process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 8) ?? "dev";
+
+const SOURCE = `
 /**
  * Xtrude service worker.
  *
- * Phase 0.5 has no backend, so there is nothing dynamic to reconcile - the
- * whole job is making the shell open instantly and work with no network.
- *
- * VERSION is rewritten at build time by scripts/stamp-sw.mjs, so every deploy
- * gets a fresh cache and stale chunk references can't strand a client.
+ * Phase 1 has a live backend now, so pages are no longer immutable - the
+ * caching strategy below still holds: network-first for navigations means a
+ * signed-in reload always sees fresh session data when online, and only
+ * falls back to the last-seen cache when offline.
  */
 
-const VERSION = "dev";
-const CACHE = `xtrude-${VERSION}`;
+const VERSION = ${JSON.stringify(VERSION)};
+const CACHE = \`xtrude-\${VERSION}\`;
 
 /** Routes worth having before the first offline open. */
 const SHELL = [
@@ -54,7 +68,7 @@ async function cacheFirst(request) {
   return response;
 }
 
-/** Pages: prefer the network so a deploy is picked up, fall back to cache. */
+/** Pages: prefer the network so a deploy - or new data - is picked up, fall back to cache. */
 async function networkFirst(request) {
   try {
     const response = await fetch(request);
@@ -105,3 +119,14 @@ self.addEventListener("fetch", (event) => {
   }
   event.respondWith(staleWhileRevalidate(request));
 });
+`;
+
+export function GET() {
+  return new NextResponse(SOURCE, {
+    headers: {
+      "Content-Type": "application/javascript; charset=utf-8",
+      "Cache-Control": "public, max-age=0, must-revalidate",
+      "Service-Worker-Allowed": "/",
+    },
+  });
+}

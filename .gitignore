@@ -1,5 +1,7 @@
-# python
+# secrets - never committed, Onshape and Supabase keys live here
 .env
+.env.local
+.env.*.local
 __pycache__/
 *.pyc
 

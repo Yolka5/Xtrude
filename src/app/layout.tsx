@@ -5,6 +5,7 @@ import { AppChrome } from "@/components/AppChrome";
 import { GlassDefs } from "@/components/GlassDefs";
 import { PageTransition } from "@/components/PageTransition";
 import { MotionProvider } from "@/components/MotionProvider";
+import { NavTitleProvider } from "@/components/NavTitle";
 import { ServiceWorker } from "@/components/ServiceWorker";
 import { FONT_VARS } from "@/lib/fonts";
 
@@ -55,16 +56,18 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" className={FONT_VARS}>
       <body>
         <GlassDefs />
-        <MotionProvider>
-          <AppChrome />
-          <div className="app">
-            <PageTransition>{children}</PageTransition>
-          </div>
-          {/* No scroll-edge fades needed anymore: the nav bar is solid once
-              stuck (glass is tab-bar only now) and fully transparent before
-              that, with nothing behind it to ghost through. */}
-          <TabBar />
-        </MotionProvider>
+        <NavTitleProvider>
+          <MotionProvider>
+            <AppChrome />
+            <div className="app">
+              <PageTransition>{children}</PageTransition>
+            </div>
+            {/* No scroll-edge fades needed anymore: the nav bar is solid once
+                stuck (glass is tab-bar only now) and fully transparent before
+                that, with nothing behind it to ghost through. */}
+            <TabBar />
+          </MotionProvider>
+        </NavTitleProvider>
         <ServiceWorker />
       </body>
     </html>

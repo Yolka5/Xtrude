@@ -5,7 +5,6 @@ import { motion, useAnimationControls, useReducedMotion } from "motion/react";
 import { Icon } from "./Icon";
 import { CountUp } from "./CountUp";
 import { TiltHero } from "./TiltHero";
-import { STREAK } from "@/lib/fixtures";
 import { haptics } from "@/lib/haptics";
 import { burstAt } from "@/lib/confetti";
 
@@ -20,9 +19,14 @@ import { burstAt } from "@/lib/confetti";
  * Reduce Motion switches off; the tap still registers, it just doesn't do
  * the burst.
  */
-export function StreakHero() {
+export function StreakHero({ current, longest }: { current: number; longest: number }) {
   const reduced = useReducedMotion();
-  const toBeat = STREAK.longest - STREAK.current + 1;
+  // Fixtures never hit current >= longest (they were hand-tuned so there was
+  // always a record left to chase); real data eventually will, the moment a
+  // live streak becomes the longest one ever. "0 to beat it" or a negative
+  // number would read as broken, so that case gets its own copy instead.
+  const atRecord = current >= longest;
+  const toBeat = longest - current + 1;
   const emberRef = useRef<HTMLDivElement>(null);
   const controls = useAnimationControls();
   const [lit, setLit] = useState(false);
@@ -119,10 +123,10 @@ export function StreakHero() {
         <div className="stack" style={{ gap: 4 }}>
           <div style={{ display: "flex", alignItems: "baseline", gap: 7 }}>
             <span className="hero-value" style={{ fontSize: 68 }}>
-              <CountUp value={STREAK.current} />
+              <CountUp value={current} />
             </span>
             <span className="hero-unit" style={{ fontSize: 22 }}>
-              {STREAK.current === 1 ? "day" : "days"}
+              {current === 1 ? "day" : "days"}
             </span>
           </div>
           <span id="streak-h" className="hero-label">Current streak</span>
@@ -133,11 +137,11 @@ export function StreakHero() {
 
       <div className="spread">
         <span className="t-footnote hero-sub">
-          Longest ever <strong className="num" style={{ color: "var(--label)" }}>{STREAK.longest}</strong> days
+          Longest ever <strong className="num" style={{ color: "var(--label)" }}>{longest}</strong> days
         </span>
         <span className="hero-chip">
           <Icon name="bolt" size={12} filled />
-          {toBeat} to beat it
+          {atRecord ? "New record" : `${toBeat} to beat it`}
         </span>
       </div>
     </TiltHero>

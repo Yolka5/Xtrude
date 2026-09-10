@@ -1,15 +1,38 @@
 import { FlyItem } from "@/components/FlyItem";
 import { SessionRow } from "@/components/SessionRow";
-import { SESSIONS } from "@/lib/fixtures";
+import { getRealData } from "@/lib/db/queries";
+import type { Session } from "@/lib/fixtures";
 import { dayLabel, duration, plural } from "@/lib/format";
 
-export default function SessionsScreen() {
+export const dynamic = "force-dynamic";
+
+export default async function SessionsScreen() {
+  const { sessions: allSessions, hasAnyData } = await getRealData();
+
   // group newest-first by day
-  const byDay = new Map<string, typeof SESSIONS>();
-  for (const s of SESSIONS) {
+  const byDay = new Map<string, Session[]>();
+  for (const s of allSessions) {
     const list = byDay.get(s.date);
     if (list) list.push(s);
     else byDay.set(s.date, [s]);
+  }
+
+  if (!hasAnyData) {
+    return (
+      <main className="screen">
+        <FlyItem>
+          <h1 className="screen__title">Sessions</h1>
+          <p className="screen__subtitle t-subhead">Last 0 days of tracked work.</p>
+        </FlyItem>
+        <FlyItem>
+          <section className="chunk" style={{ textAlign: "center" }}>
+            <p className="t-footnote dim" style={{ margin: 0 }}>
+              No sessions yet. Run the backfill to pull your real Onshape history.
+            </p>
+          </section>
+        </FlyItem>
+      </main>
+    );
   }
 
   return (
