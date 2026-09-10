@@ -145,7 +145,13 @@ body {
 
 a { color: var(--label); text-decoration: none; }
 
-button { font: inherit; color: inherit; border: 0; background: none; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+button { font: inherit; color: inherit; border: 0; background: none; cursor: pointer; }
+
+/* Chrome/Android paints a blue rectangle over tappable elements. The app's
+   own press states (Chunky whileTap, TiltHero squash, .tab:active) have to
+   carry the feedback once this is gone. Keyboard users still get the
+   :focus-visible outline below. */
+* { -webkit-tap-highlight-color: transparent; }
 
 :focus-visible { outline: 3px solid var(--label); outline-offset: 2px; border-radius: 8px; }
 
@@ -513,6 +519,8 @@ button { font: inherit; color: inherit; border: 0; background: none; cursor: poi
   text-decoration: none; border-radius: var(--r-pill);
   transition: color 0.2s ease;
 }
+.tab:active .tab__icon { transform: translateY(1px) scale(0.9); }
+.section-link:active { opacity: 0.55; }
 .tab__label { font-size: 11px; line-height: 13px; font-weight: 800; }
 .tab[aria-current="page"] { color: var(--label); }
 .tab__pill {
