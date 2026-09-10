@@ -14,5 +14,9 @@
         { "key": "Cache-Control", "value": "public, max-age=604800, immutable" }
       ]
     }
+  ],
+  "crons": [
+    { "path": "/api/cron/sync", "schedule": "5 * * * *" },
+    { "path": "/api/cron/discover", "schedule": "0 7 * * *" }
   ]
 }
