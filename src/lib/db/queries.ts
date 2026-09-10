@@ -34,14 +34,18 @@ export async function getRealData(): Promise<RealData> {
 /** `app_state.last_sync.updated_at`, or null if it has never run. Used by
  * Today to decide whether to fire a background sync without blocking render. */
 export async function getLastSyncAt(): Promise<number | null> {
-  const { data, error } = await getSupabase()
-    .from("app_state")
-    .select("updated_at")
-    .eq("key", "last_sync")
-    .maybeSingle();
-  if (error || !data?.updated_at) return null;
-  const ms = Date.parse(data.updated_at as string);
-  return Number.isFinite(ms) ? ms : null;
+  try {
+    const { data, error } = await getSupabase()
+      .from("app_state")
+      .select("updated_at")
+      .eq("key", "last_sync")
+      .maybeSingle();
+    if (error || !data?.updated_at) return null;
+    const ms = Date.parse(data.updated_at as string);
+    return Number.isFinite(ms) ? ms : null;
+  } catch {
+    return null;
+  }
 }
 
 /** Session detail needs a real per-document edit breakdown, which the
