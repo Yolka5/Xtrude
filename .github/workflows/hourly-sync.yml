@@ -1,0 +1,35 @@
+name: Hourly Onshape sync
+
+# Vercel Hobby refuses any cron more frequent than daily, so this is the
+# scheduled backstop for /api/cron/sync. The Today page also syncs itself
+# when last_sync is older than 15 minutes; this job covers hours the app
+# is not open (idle sessions still need to finalize).
+#
+# Required repo secret (Settings → Secrets and variables → Actions):
+#   CRON_SECRET  — same value as the Vercel env var of the same name.
+
+on:
+  schedule:
+    - cron: "5 * * * *"
+  workflow_dispatch:
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: POST /api/cron/sync
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          if [ -z "$CRON_SECRET" ]; then
+            echo "Missing GitHub Actions secret CRON_SECRET."
+            echo "Add it at Settings → Secrets and variables → Actions."
+            echo "Use the same value as the Vercel CRON_SECRET env var."
+            exit 1
+          fi
+          curl -fsS -X POST "https://xtrude-sooty.vercel.app/api/cron/sync" \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
+            -H "Content-Type: application/json" \
+            --max-time 90 \
+            -d "{}"
