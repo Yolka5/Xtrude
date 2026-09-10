@@ -41,9 +41,13 @@ export default async function AdminPage() {
     .order("received_at", { ascending: false })
     .limit(50);
 
-  const { data: stateRows } = await supabase.from("app_state").select("key, value, updated_at").in("key", ["last_sync", "last_discovery"]);
+  const { data: stateRows } = await supabase
+    .from("app_state")
+    .select("key, value, updated_at")
+    .in("key", ["last_sync", "last_discovery", "last_rollup"]);
   const lastSync = stateRows?.find((r) => r.key === "last_sync");
   const lastDiscovery = stateRows?.find((r) => r.key === "last_discovery");
+  const lastRollup = stateRows?.find((r) => r.key === "last_rollup");
 
   const rows = (deliveries ?? []) as unknown as Delivery[];
   const mostRecent = rows[0]?.received_at;
@@ -62,14 +66,19 @@ export default async function AdminPage() {
           detail={mostRecent ?? "no deliveries logged yet"}
         />
         <StatusCard
-          label="Last hourly sync"
+          label="Last sync"
           value={lastSync ? timeAgo(lastSync.updated_at) : "never ran"}
-          detail={lastSync ? summarizeSync(lastSync.value) : "check CRON_SECRET / Vercel Cron config"}
+          detail={lastSync ? summarizeSync(lastSync.value) : "page load or GitHub Actions hourly"}
         />
         <StatusCard
           label="Last daily discovery"
           value={lastDiscovery ? timeAgo(lastDiscovery.updated_at) : "never ran"}
-          detail={lastDiscovery ? summarizeDiscovery(lastDiscovery.value) : "check CRON_SECRET / Vercel Cron config"}
+          detail={lastDiscovery ? summarizeDiscovery(lastDiscovery.value) : "Vercel Cron at 21:00 UTC (midnight Asia/Jerusalem)"}
+        />
+        <StatusCard
+          label="Last daily rollup"
+          value={lastRollup ? timeAgo(lastRollup.updated_at) : "never ran"}
+          detail={lastRollup ? summarizeRollup(lastRollup.value) : "same job as discovery, midnight Asia/Jerusalem"}
         />
       </section>
 
@@ -144,9 +153,18 @@ function summarizeDiscovery(v: any): string {
   const parts = [
     `${v.documentsSeen ?? 0} seen`,
     `${v.documentsAdded ?? 0} added`,
+    `${v.documentsBackfilled ?? 0} first-backfilled`,
     `${v.webhooksRegistered ?? 0} registered`,
     `${v.callsUsed ?? 0} calls`,
   ];
   if (v.errors?.length) parts.push(`${v.errors.length} error(s)`);
+  return parts.join(" · ");
+}
+
+function summarizeRollup(v: any): string {
+  if (!v) return "";
+  const parts: string[] = [];
+  if (v.rollup) parts.push(`${v.rollup.sessionsWritten ?? 0} sessions`, `${v.rollup.activeDays ?? 0} active days`);
+  if (v.streak) parts.push(`streak ${v.streak.current ?? 0} (best ${v.streak.longest ?? 0})`);
   return parts.join(" · ");
 }

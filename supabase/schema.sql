@@ -24,7 +24,7 @@ create table if not exists tracked_documents (
   -- endpoint the moment a real model-change delivery arrives for this
   -- document - a cheap marker, not the microversion data itself (Onshape's
   -- notification payload doesn't carry one, see webhookIngest.mjs). The
-  -- hourly sync cron treats "notified more recently than synced" as its
+  -- page-load / GitHub Actions sync treats "notified more recently than synced" as its
   -- worklist, so a document with no new activity costs it nothing.
   last_notified_at      timestamptz,
   last_synced_at        timestamptz

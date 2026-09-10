@@ -6,13 +6,19 @@ import { RecentSessionCard } from "@/components/SessionRow";
 import { FlyItem } from "@/components/FlyItem";
 import { PullToRefresh } from "@/components/PullToRefresh";
 import { Icon } from "@/components/Icon";
-import { getRealData } from "@/lib/db/queries";
+import { getLastSyncAt, getRealData } from "@/lib/db/queries";
 import { duration, durationSpoken, longDate, plural, splitDuration } from "@/lib/format";
+import { BackgroundSync } from "@/components/BackgroundSync";
+import { PAGE_SYNC_MAX_AGE_MS } from "@/lib/pageSync";
 
 export const dynamic = "force-dynamic"; // always today's real numbers, never cached stale
 
 export default async function TodayScreen() {
-  const { today, todayStats, streak, week, sessions, hasAnyData } = await getRealData();
+  const [{ today, todayStats, streak, week, sessions, hasAnyData }, lastSyncAt] = await Promise.all([
+    getRealData(),
+    getLastSyncAt(),
+  ]);
+  const needsSync = lastSyncAt === null || Date.now() - lastSyncAt > PAGE_SYNC_MAX_AGE_MS;
   const todaySplit = splitDuration(todayStats.scoredMinutes);
   const mostRecent = sessions[0];
   const weekSoFar = streak.weekMinutes;
@@ -26,6 +32,7 @@ export default async function TodayScreen() {
 
   return (
     <PullToRefresh>
+      <BackgroundSync needed={needsSync} />
       <main className="screen">
         <FlyItem>
           <h1 className="screen__title">Today</h1>

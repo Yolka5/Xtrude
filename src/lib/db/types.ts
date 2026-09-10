@@ -8,6 +8,8 @@ export interface TrackedDocumentRow {
   onshape_workspace_id: string;
   name: string;
   last_backfilled_at: string | null;
+  last_notified_at: string | null;
+  last_synced_at: string | null;
   created_at: string;
 }
 

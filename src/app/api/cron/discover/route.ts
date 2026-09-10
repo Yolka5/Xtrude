@@ -2,27 +2,36 @@ import "server-only";
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { makeClient } from "../../../../../scripts/lib/onshape.mjs";
+import { ingestDocumentHistory } from "../../../../../scripts/lib/ingestDocument.mjs";
+import { rebuildSessions } from "../../../../../scripts/lib/sessionRebuild.mjs";
+import { snapshotStreak } from "../../../../../scripts/lib/streakSnapshot.mjs";
 import { requireEnv } from "@/lib/env";
+import { cronAuthorized, unauthorizedCron } from "@/lib/cronAuth";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
-export const maxDuration = 30;
+export const maxDuration = 60;
 
 /**
- * Daily Vercel Cron: the only way a document created after the last wipe
- * ever gets watched. Onshape webhooks are registered per documentId, so a
- * brand-new document has no registration until something explicitly finds
- * it and calls createWebhook for it - this is that something.
+ * Daily Vercel Cron (midnight Asia/Jerusalem, 21:00 UTC): the only way a
+ * document created after the last wipe ever gets watched. Onshape webhooks
+ * are registered per documentId, so a brand-new document has no
+ * registration until something finds it and calls createWebhook.
  *
- * Deliberately does NOT pull any history for a newly-discovered document
- * (no documenthistory call, no backfilled events) - "Xtrude tracks from the
- * day you connect it" applies here too: a document is connected the moment
- * this job finds it and registers its webhook, and everything from that
- * point on arrives live. Budgeted to stay near 1 Onshape call/day in the
- * steady state (just listMyDocuments) - each newly discovered document adds
- * up to 2 more (workspace lookup + webhook registration), capped by
- * MAX_ONSHAPE_CALLS so a large batch of new documents spreads across
- * several days rather than spending the run's whole budget at once.
+ * On first discovery of a document this job has never seen, it also pulls
+ * that document's history and ingests it (one documenthistory call).
+ * Webhooks only fire after registration, so any modelling done between
+ * "document created" and "this job found it" would otherwise be lost.
+ * `last_backfilled_at` records that the pull happened; a later run will
+ * not re-pull.
+ *
+ * The same run rebuilds sessions/daily_stats and snapshots streak state
+ * so a missed day breaks the streak at midnight even if nobody opens the
+ * app.
+ *
+ * Steady state: 1 Onshape call (listMyDocuments). Each newly discovered
+ * document adds 1 history pull + 1 webhook registration (+ 1 workspace
+ * lookup only when the list payload omitted defaultWorkspace).
  */
 
 const EVENTS = [
@@ -33,13 +42,8 @@ const EVENTS = [
 ];
 const MAX_ONSHAPE_CALLS = 10;
 
-function unauthorized() {
-  return NextResponse.json({ ok: false, reason: "unauthorized" }, { status: 401 });
-}
-
-export async function GET(req: NextRequest) {
-  const cronSecret = process.env.CRON_SECRET;
-  if (cronSecret && req.headers.get("authorization") !== `Bearer ${cronSecret}`) return unauthorized();
+async function handle(req: NextRequest) {
+  if (!cronAuthorized(req)) return unauthorizedCron();
 
   const webhookUrl = requireEnv("WEBHOOK_URL");
   const supabase = createClient(requireEnv("SUPABASE_URL"), requireEnv("SUPABASE_SERVICE_ROLE_KEY"), {
@@ -56,9 +60,13 @@ export async function GET(req: NextRequest) {
     at: now.toISOString(),
     documentsSeen: 0,
     documentsAdded: 0,
+    documentsBackfilled: 0,
+    backfillEventsWritten: 0,
     webhooksRegistered: 0,
     errors: [] as string[],
     callsUsed: 0,
+    rollup: null as unknown,
+    streak: null as unknown,
   };
 
   try {
@@ -83,12 +91,34 @@ export async function GET(req: NextRequest) {
         if (insertErr) throw new Error(`inserting tracked_documents: ${insertErr.message}`);
         summary.documentsAdded++;
         knownIds.add(doc.id);
-        // Fall through to the registration pass below by treating it like
-        // any other document missing a registration.
         void inserted;
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         summary.errors.push(`discover ${doc.name}: ${message}`);
+      }
+    }
+
+    // First-seen documents only: last_backfilled_at is null. Existing
+    // tracked docs from the original seed already have this set, so a
+    // re-run cannot re-pull their (truncated-at-50) history.
+    const { data: needsBackfill, error: backfillErr } = await supabase
+      .from("tracked_documents")
+      .select("id, onshape_document_id, onshape_workspace_id, name")
+      .is("last_backfilled_at", null);
+    if (backfillErr) throw new Error(`loading un-backfilled documents: ${backfillErr.message}`);
+
+    for (const doc of needsBackfill ?? []) {
+      if (onshape.callsUsed() >= MAX_ONSHAPE_CALLS) {
+        summary.errors.push(`${doc.name}: first-history skipped, call budget reached this run - will retry tomorrow.`);
+        continue;
+      }
+      try {
+        const ingested = await ingestDocumentHistory(supabase, onshape, doc, { markBackfilled: true, now });
+        summary.documentsBackfilled++;
+        summary.backfillEventsWritten += ingested.eventsWritten;
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        summary.errors.push(`backfill ${doc.name}: ${message}`);
       }
     }
 
@@ -130,8 +160,29 @@ export async function GET(req: NextRequest) {
     summary.errors.push(message);
   }
 
+  try {
+    summary.rollup = await rebuildSessions(supabase, { excludeLiveTail: true, now });
+    summary.streak = await snapshotStreak(supabase, now);
+    await supabase.from("app_state").upsert({
+      key: "last_rollup",
+      value: { rollup: summary.rollup, streak: summary.streak },
+      updated_at: now.toISOString(),
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    summary.errors.push(`rollup: ${message}`);
+  }
+
   summary.callsUsed = onshape.callsUsed();
   await supabase.from("app_state").upsert({ key: "last_discovery", value: summary, updated_at: now.toISOString() });
 
   return NextResponse.json({ ok: summary.errors.length === 0, ...summary });
+}
+
+export async function GET(req: NextRequest) {
+  return handle(req);
+}
+
+export async function POST(req: NextRequest) {
+  return handle(req);
 }

@@ -18,8 +18,9 @@ export const runtime = "nodejs";
  * Deliberately does no Onshape API calls itself (no documenthistory fetch,
  * no lookups) - it only reads/writes our own Supabase tables, so it stays
  * fast and never risks the annual Onshape call budget on a per-delivery
- * basis. It just timestamps `tracked_documents.last_notified_at`; the
- * hourly sync cron (src/app/api/cron/sync) does the actual Onshape read.
+ * basis. It just timestamps `tracked_documents.last_notified_at`; /api/sync
+ * (Today page load) and /api/cron/sync (GitHub Actions hourly) do the
+ * actual Onshape read.
  *
  * Onshape's own lifecycle events (webhook.register / webhook.ping /
  * webhook.unregister) arrive here too, as validation - accepted and logged,
