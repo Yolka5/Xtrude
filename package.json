@@ -12,6 +12,7 @@
     "contrast": "node scripts/check-contrast.mjs",
     "backfill": "node scripts/backfill.mjs",
     "recompute-sessions": "node scripts/recompute-sessions.mjs",
+    "wipe-seed": "node scripts/wipe-seed.mjs",
     "verify": "tsx scripts/verify-derive.ts"
   },
   "dependencies": {

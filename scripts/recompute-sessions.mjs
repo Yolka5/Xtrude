@@ -18,7 +18,7 @@
  */
 import { loadEnv, requireEnv } from "./lib/env.mjs";
 import { createClient } from "@supabase/supabase-js";
-import { clusterSessions, IDLE_THRESHOLD_MINUTES, LEAD_IN_MINUTES, MAX_SESSION_HOURS, MIN_EVENTS } from "./lib/sessionAlgorithm.mjs";
+import { clusterSessions, IDLE_THRESHOLD_MINUTES, LEAD_IN_MINUTES, MAX_SESSION_HOURS, MIN_EVENTS, MIN_SPAN_MINUTES } from "./lib/sessionAlgorithm.mjs";
 
 loadEnv();
 
@@ -71,12 +71,15 @@ async function main() {
   section("2. CLUSTER");
   console.log(
     `IDLE_THRESHOLD=${IDLE_THRESHOLD_MINUTES}m  LEAD_IN=${LEAD_IN_MINUTES}m  ` +
-      `MAX_SESSION=${MAX_SESSION_HOURS}h  MIN_EVENTS=${MIN_EVENTS}`
+      `MAX_SESSION=${MAX_SESSION_HOURS}h  MIN_EVENTS=${MIN_EVENTS}  MIN_SPAN=${MIN_SPAN_MINUTES}m`
   );
   const clusters = clusterSessions(events);
   const kept = clusters.filter((c) => c.kept);
   const dropped = clusters.length - kept.length;
-  console.log(`${clusters.length} raw cluster(s) -> ${kept.length} kept, ${dropped} dropped (< ${MIN_EVENTS} events).`);
+  console.log(
+    `${clusters.length} raw cluster(s) -> ${kept.length} kept, ${dropped} dropped ` +
+      `(< ${MIN_EVENTS} events or < ${MIN_SPAN_MINUTES}m span).`
+  );
 
   const sessionRows = kept.map((s) => ({
     started_at: s.startedAt,

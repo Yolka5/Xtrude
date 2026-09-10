@@ -134,8 +134,8 @@ export default async function SessionDetail({ params }: { params: Promise<{ id: 
           </div>
           <p className="t-caption dimmer" style={{ margin: "12px 0 0" }}>
             Edits more than {SCORING.idleThresholdMinutes} minutes apart start a new session.
-            Clusters under {SCORING.minEvents} edits are discarded as noise, and no single
-            session is credited past {SCORING.maxSessionHours} hours.
+            Clusters under 2 edits, or spanning under 2 minutes, are discarded as noise, and no
+            single session is credited past {SCORING.maxSessionHours} hours.
           </p>
         </section>
       </FlyItem>

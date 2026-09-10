@@ -1,6 +1,7 @@
 /**
  * Regression check for the pure derivation logic in src/lib/db/derive.ts -
- * streak math, records, badge claims - against synthetic session/daily
+ * streak math, records, badge claims - and for the noise filter in
+ * scripts/lib/sessionAlgorithm.mjs, against synthetic session/daily/event
  * rows. No live Supabase project needed, which is the point: this is the
  * one place worth automated coverage even before real credentials exist,
  * since it's arithmetic a human won't reliably eyeball-check on every edit.
@@ -8,6 +9,7 @@
  * Run: npm run verify
  */
 import { deriveRealData } from "../src/lib/db/derive";
+import { clusterSessions, MIN_EVENTS, MIN_SPAN_MINUTES } from "./lib/sessionAlgorithm.mjs";
 
 const DAY = 86_400_000;
 // Fix "today" to a known Wednesday: 2026-09-09 12:00 UTC (matches the app's
@@ -139,6 +141,72 @@ check("daily is dense (no gaps)", (() => {
 
 console.log("\nweek:", JSON.stringify(result.week.map((d) => `${d.label}:${d.scoredMinutes}${d.isFuture ? "(future)" : ""}${d.isToday ? "(today)" : ""}`)));
 console.log("profile:", JSON.stringify(result.profile, null, 2));
+
+// --- clusterSessions / noise filter -----------------------------------
+// Two-part rule: a cluster is kept only if it has >= MIN_EVENTS AND spans
+// >= MIN_SPAN_MINUTES from first to last event. Event count alone used to
+// be the whole rule; these cases are the ones that rule got wrong.
+console.log(`\nnoise filter: MIN_EVENTS=${MIN_EVENTS} MIN_SPAN_MINUTES=${MIN_SPAN_MINUTES}`);
+
+const CLUSTER_BASE_MS = Date.parse("2026-09-01T09:00:00Z");
+function mkEvents(offsetsSeconds: number[], docId = "doc1") {
+  return offsetsSeconds.map((s) => ({
+    occurred_at: new Date(CLUSTER_BASE_MS + s * 1000).toISOString(),
+    document_id: docId,
+  }));
+}
+
+const clusterCases: { label: string; offsets: number[]; expectKept: boolean }[] = [
+  {
+    label: "5 events spanning 4s (enough events, too short a span) -> dropped",
+    offsets: [0, 1, 2, 3, 4],
+    expectKept: false,
+  },
+  {
+    label: "3-second autosave tick (2 events) -> dropped",
+    offsets: [0, 3],
+    expectKept: false,
+  },
+  {
+    label: "35-second autosave cluster (4 events) -> dropped",
+    offsets: [0, 10, 20, 35],
+    expectKept: false,
+  },
+  {
+    label: "single event (0s span) -> dropped",
+    offsets: [0],
+    expectKept: false,
+  },
+  {
+    label: "span exactly at the 2-minute floor (2 events, 120s) -> kept",
+    offsets: [0, 120],
+    expectKept: true,
+  },
+  {
+    label: "real short session, 4m38s (3 events) -> kept",
+    offsets: [0, 140, 278],
+    expectKept: true,
+  },
+  {
+    label: "real short session, 10m39s (3 events) -> kept",
+    offsets: [0, 300, 639],
+    expectKept: true,
+  },
+  {
+    label: "real short session, 15m8s (3 events) -> kept",
+    offsets: [0, 500, 908],
+    expectKept: true,
+  },
+];
+
+for (const c of clusterCases) {
+  const [cluster] = clusterSessions(mkEvents(c.offsets));
+  check(
+    `clusterSessions: ${c.label}`,
+    cluster.kept === c.expectKept,
+    `got kept=${cluster.kept} (events=${cluster.eventCount}, spanSeconds=${cluster.spanSeconds})`
+  );
+}
 
 console.log(failures ? `\n${failures} check(s) FAILED` : "\nAll checks pass.");
 process.exit(failures ? 1 : 0);
