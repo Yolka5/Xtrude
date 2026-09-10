@@ -1,36 +1,44 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import { AnimatePresence, motion } from "motion/react";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 
 /**
- * Cross-fades between the four screens.
+ * Tab switches: not a cross-fade. The outgoing screen's blocks fly up and
+ * out in a fast cascade; the incoming screen's blocks fly in from below,
+ * staggered - each one propagated down to a <FlyItem> wrapping that screen's
+ * top-level sections (see each page's JSX). This component only owns the
+ * container's state ("hidden"/"show"/"exit") and the stagger timing; the
+ * per-item motion lives in FlyItem.
  *
- * Deliberately short. This runs on every tab tap, and HIG > Motion warns
- * against making people wait through an animation they will see hundreds of
- * times. Under Reduce Motion it collapses to a plain swap, which also satisfies
- * the guidance to replace x/y transitions with fades.
- *
- * Note this component - not the pages - owns the transform. The nav and tab
- * bars are position: fixed and are rendered outside it in the layout, because
- * an ancestor transform would turn them into descendants of this element's
- * containing block and drag them along with the page.
+ * No component here branches on useReducedMotion() to change its TREE - the
+ * hook returns null during static prerender, so a structural branch would
+ * render one tree on the server and another on the client (a real hydration
+ * mismatch this app hit once already). It's still read here to zero out the
+ * stagger/delay timing values: MotionConfig's reducedMotion="user" only
+ * neutralizes transform, so left alone the container would still schedule
+ * each FlyItem's (now-instant) snap after its normal staggerChildren delay -
+ * calm, but not instant. Branching a timing NUMBER, never the JSX, keeps the
+ * hydration guarantee intact.
  */
 export function PageTransition({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const reduced = useReducedMotion();
 
-  // No branching on useReducedMotion() here: the hook returns null during
-  // static prerender, so a branch would render one tree on the server and
-  // another on the client. MotionProvider's reducedMotion="user" strips the
-  // y-translation and leaves the fade, with the structure unchanged.
+  const pageVariants = {
+    hidden: {},
+    show: { transition: reduced ? { staggerChildren: 0, delayChildren: 0 } : { staggerChildren: 0.05, delayChildren: 0.04 } },
+    exit: { transition: reduced ? { staggerChildren: 0 } : { staggerChildren: 0.025, staggerDirection: -1 } },
+  };
+
   return (
     <AnimatePresence mode="wait" initial={false}>
       <motion.div
         key={pathname}
-        initial={{ opacity: 0, y: 8 }}
-        animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0, y: -4 }}
-        transition={{ duration: 0.19, ease: [0.22, 0.9, 0.28, 1] }}
+        variants={pageVariants}
+        initial="hidden"
+        animate="show"
+        exit="exit"
         style={{ flex: 1, display: "flex", flexDirection: "column" }}
       >
         {children}

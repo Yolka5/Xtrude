@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion } from "motion/react";
 import { Icon, type IconName } from "./Icon";
+import { haptics } from "@/lib/haptics";
 
 const TABS: { href: string; label: string; icon: IconName; match: RegExp }[] = [
   { href: "/",         label: "Today",    icon: "today",    match: /^\/$/ },
@@ -13,10 +14,13 @@ const TABS: { href: string; label: string; icon: IconName; match: RegExp }[] = [
 ];
 
 /**
- * Functional layer: Liquid Glass, floating clear of the screen edges, sitting
+ * The one glass surface left in the app - real SVG-displacement refraction
+ * where Chrome supports referencing an SVG filter from backdrop-filter (see
+ * globals.css's @supports guard + GlassDefs' #xtr-glass-distort), a plain
+ * frosted blur everywhere else. Floats clear of the screen edges, sitting
  * above the iOS home indicator via env(safe-area-inset-bottom).
  *
- * The selection pill carries a shared layoutId, so switching tabs slides one
+ * The selection pill carries a shared layoutId, so switching tabs morphs one
  * pill across rather than cutting between two. Selection is still signalled
  * three ways - pill, colour, and a heavier glyph - so it survives Reduce
  * Motion and colour blindness alike.
@@ -26,8 +30,7 @@ export function TabBar() {
   const path = raw.length > 1 ? raw.replace(/\/+$/, "") || "/" : raw;
 
   return (
-    <nav className="tabbar glass" aria-label="Primary">
-      <span className="glass-lens" aria-hidden="true" />
+    <nav className="tabbar" aria-label="Primary">
       {TABS.map((t) => {
         const active = t.match.test(path);
         return (
@@ -36,6 +39,7 @@ export function TabBar() {
             href={t.href}
             className="tab"
             aria-current={active ? "page" : undefined}
+            onClick={() => haptics.tap()}
           >
             {active ? (
               <motion.span

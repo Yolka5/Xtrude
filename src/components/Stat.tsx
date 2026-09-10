@@ -1,12 +1,12 @@
 import type { ReactNode } from "react";
 import { CountUp } from "./CountUp";
+import { Chunky } from "./Chunky";
 
 /**
  * Content layer. Solid surface, opaque text - nothing translucent ever sits
- * behind a number in this app.
- *
- * These are deliberately quiet: flat shadow, small label, mid-size numeral.
- * Each screen has exactly one element allowed to shout, and it is never this.
+ * behind a number in this app. Chunky like everything else, but a size step
+ * down from the hero: this is a supporting stat, not the screen's one loud
+ * moment.
  */
 export function StatCard({
   label,
@@ -33,7 +33,7 @@ export function StatCard({
 }) {
   const numeric = typeof value === "number";
   return (
-    <div className="card stack" style={{ gap: 8, justifyContent: "space-between" }}>
+    <Chunky className="chunk stack" style={{ gap: 8, justifyContent: "space-between" }}>
       <div className="row" style={{ gap: 7 }}>
         {icon}
         <span className="stat-label">{label}</span>
@@ -60,6 +60,6 @@ export function StatCard({
         ) : null}
       </div>
       {footnote ? <div className="t-caption dim">{footnote}</div> : null}
-    </div>
+    </Chunky>
   );
 }
