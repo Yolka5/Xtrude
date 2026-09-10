@@ -9,6 +9,9 @@ export function unauthorizedCron(): NextResponse {
 
 export function cronAuthorized(req: NextRequest): boolean {
   const cronSecret = process.env.CRON_SECRET;
-  if (!cronSecret) return true;
+  // On Vercel, an unset secret would otherwise leave the cron routes open
+  // to the internet (and to Onshape-call spend). Locally, unset still
+  // means "open" so `next dev` can poke them without extra setup.
+  if (!cronSecret) return !process.env.VERCEL;
   return req.headers.get("authorization") === `Bearer ${cronSecret}`;
 }

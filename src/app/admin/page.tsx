@@ -52,6 +52,20 @@ export default async function AdminPage() {
   const rows = (deliveries ?? []) as unknown as Delivery[];
   const mostRecent = rows[0]?.received_at;
 
+  const envNames = [
+    "SUPABASE_URL",
+    "SUPABASE_SERVICE_ROLE_KEY",
+    "ONSHAPE_ACCESS_KEY",
+    "ONSHAPE_SECRET_KEY",
+    "ONSHAPE_OAUTH_CLIENT_ID",
+    "ONSHAPE_OAUTH_CLIENT_SECRET",
+    "WEBHOOK_URL",
+    "CRON_SECRET",
+  ] as const;
+  const envMissing = envNames.filter((name) => !process.env[name]);
+  const webhookUrl = process.env.WEBHOOK_URL ?? "";
+  const webhookUrlOk = webhookUrl === "https://xtrude-sooty.vercel.app/api/webhooks/onshape";
+
   return (
     <main style={{ padding: "24px 20px 60px", fontFamily: "ui-monospace, monospace", maxWidth: 900, margin: "0 auto" }}>
       <h1 style={{ fontSize: 20, marginBottom: 4 }}>Xtrude admin</h1>
@@ -79,6 +93,17 @@ export default async function AdminPage() {
           label="Last daily rollup"
           value={lastRollup ? timeAgo(lastRollup.updated_at) : "never ran"}
           detail={lastRollup ? summarizeRollup(lastRollup.value) : "same job as discovery, midnight Asia/Jerusalem"}
+        />
+        <StatusCard
+          label="Vercel env"
+          value={envMissing.length === 0 ? "all set" : `${envMissing.length} missing`}
+          detail={
+            envMissing.length === 0
+              ? webhookUrlOk
+                ? "WEBHOOK_URL matches the production endpoint"
+                : `WEBHOOK_URL is set but is not the production /api/webhooks/onshape URL`
+              : `missing: ${envMissing.join(", ")}`
+          }
         />
       </section>
 

@@ -22,7 +22,7 @@ export function BackgroundSync({ needed }: { needed: boolean }) {
     started.current = true;
     inFlight = true;
 
-    fetch("/api/sync", { method: "POST" })
+    fetch("/api/sync/", { method: "POST" })
       .then(async (res) => {
         const body = await res.json().catch(() => null);
         if (body?.skipped) return;

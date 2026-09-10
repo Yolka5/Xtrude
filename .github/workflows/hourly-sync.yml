@@ -28,7 +28,7 @@ jobs:
             echo "Use the same value as the Vercel CRON_SECRET env var."
             exit 1
           fi
-          curl -fsS -X POST "https://xtrude-sooty.vercel.app/api/cron/sync" \
+          curl -fsS -X POST "https://xtrude-sooty.vercel.app/api/cron/sync/" \
             -H "Authorization: Bearer ${CRON_SECRET}" \
             -H "Content-Type: application/json" \
             --max-time 90 \
