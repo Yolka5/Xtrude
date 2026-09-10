@@ -334,6 +334,10 @@ button { font: inherit; color: inherit; border: 0; background: none; cursor: poi
 .heat__cell[data-level="2"] { background: var(--heat-2); }
 .heat__cell[data-level="3"] { background: var(--heat-3); }
 .heat__cell[data-level="4"] { background: var(--heat-4); }
+/* Today reads as "lit" regardless of level - own ring, not a tone, so it
+   never gets confused with the level-0 "no activity" inset ring above, and
+   still shows once a real session gives today a colour of its own. */
+.heat__cell[data-today] { box-shadow: 0 0 0 2px #fff, 0 0 0 3.5px var(--prism-edge); }
 @keyframes cell-in { from { opacity: 0; transform: scale(0.2); } to { opacity: 1; transform: none; } }
 
 .heat-legend { display: flex; align-items: center; gap: 6px; }

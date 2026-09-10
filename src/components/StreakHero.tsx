@@ -25,7 +25,14 @@ export function StreakHero({ current, longest }: { current: number; longest: num
   // always a record left to chase); real data eventually will, the moment a
   // live streak becomes the longest one ever. "0 to beat it" or a negative
   // number would read as broken, so that case gets its own copy instead.
-  const atRecord = current >= longest;
+  //
+  // longest === 0 is a distinct third state, not a degenerate case of
+  // atRecord: it means no streak has ever existed (impossible once a single
+  // session has been logged - even a lone active day counts as a 1-day
+  // streak). "New record" for 0 days done reads as congratulating nothing;
+  // day one gets an invitation instead.
+  const neverStarted = longest === 0;
+  const atRecord = !neverStarted && current >= longest;
   const toBeat = longest - current + 1;
   const emberRef = useRef<HTMLDivElement>(null);
   const controls = useAnimationControls();
@@ -137,11 +144,13 @@ export function StreakHero({ current, longest }: { current: number; longest: num
 
       <div className="spread">
         <span className="t-footnote hero-sub">
-          Longest ever <strong className="num" style={{ color: "var(--label)" }}>{longest}</strong> days
+          {neverStarted ? "No sessions yet" : (
+            <>Longest ever <strong className="num" style={{ color: "var(--label)" }}>{longest}</strong> days</>
+          )}
         </span>
         <span className="hero-chip">
-          <Icon name="bolt" size={12} filled />
-          {atRecord ? "New record" : `${toBeat} to beat it`}
+          <Icon name={neverStarted ? "spark" : "bolt"} size={12} filled />
+          {neverStarted ? "Start your streak" : atRecord ? "New record" : `${toBeat} to beat it`}
         </span>
       </div>
     </TiltHero>

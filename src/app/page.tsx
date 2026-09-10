@@ -56,9 +56,11 @@ export default async function TodayScreen() {
               srValue={durationSpoken(weekSoFar)}
               icon={<Icon name="bolt" size={15} className="dimmer" />}
               footnote={
-                pace === 0
-                  ? "Level with last week"
-                  : `${pace > 0 ? "+" : ""}${pace}% vs. last week's pace`
+                !hasAnyData
+                  ? "Nothing modeled yet"
+                  : pace === 0
+                    ? "Level with last week"
+                    : `${pace > 0 ? "+" : ""}${pace}% vs. last week's pace`
               }
             />
           </div>

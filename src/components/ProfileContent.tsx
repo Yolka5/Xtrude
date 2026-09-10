@@ -92,12 +92,14 @@ export function ProfileContent({
   badges,
   daily,
   daysTracked,
+  hasAnyData,
 }: {
   profile: ProfileStats;
   records: PersonalRecord[];
   badges: Badge[];
   daily: DayTotal[];
   daysTracked: number;
+  hasAnyData: boolean;
 }) {
   const earned = badges.filter((b) => b.earned).length;
 
@@ -203,7 +205,9 @@ export function ProfileContent({
 
       <FlyItem>
         <p className="t-caption dimmer" style={{ margin: "20px 4px 0", textAlign: "center" }}>
-          {daysTracked} days tracked &middot; {duration(profile.lifetimeMinutes)} scored
+          {hasAnyData
+            ? `${daysTracked} days tracked · ${duration(profile.lifetimeMinutes)} scored`
+            : "Day one · nothing modeled yet"}
         </p>
       </FlyItem>
     </main>
