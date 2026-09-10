@@ -11,6 +11,11 @@
  * running count as it goes. History older than 12 months is skipped per
  * document rather than pulled and discarded, to keep the call count down on
  * documents with a long life.
+ *
+ * Also bounds *which* documents get backfilled at all: BACKFILL_MAX_DOCS
+ * (default 20) most-recently-modified documents, not "my documents" in
+ * full. Found live that this account has 600+ documents - backfilling all
+ * of them would cost 1,000+ calls, nowhere near the call budget above.
  */
 import { loadEnv, requireEnv } from "./lib/env.mjs";
 import { makeClient } from "./lib/onshape.mjs";
@@ -20,6 +25,7 @@ loadEnv();
 
 const DRY_RUN = process.argv.includes("--dry-run");
 const MAX_CALLS = Number(process.env.BACKFILL_MAX_CALLS ?? 150);
+const MAX_DOCS = Number(process.env.BACKFILL_MAX_DOCS ?? 20);
 const CUTOFF_MONTHS = 12;
 
 function rule(char = "-", width = 78) {
@@ -44,8 +50,12 @@ async function main() {
   console.log(`Call budget      : ${MAX_CALLS} (${onshape.callsUsed()} used so far)`);
 
   section("2. DOCUMENTS");
-  const docs = await onshape.listMyDocuments();
-  console.log(`Found ${docs.length} document(s) under filter=${process.env.ONSHAPE_DOCUMENT_FILTER ?? "0"} ("my documents").`);
+  const { docs, pages: docPages } = await onshape.listMyDocuments(MAX_DOCS);
+  console.log(
+    `Found ${docs.length} document(s) across ${docPages} page(s) - the ${MAX_DOCS} most recently ` +
+      `modified under filter=${process.env.ONSHAPE_DOCUMENT_FILTER ?? "0"} ("my documents"), ` +
+      `not the full account (this account has 600+ documents total).`
+  );
   console.log();
   for (const doc of docs) {
     console.log(`  ${doc.id}  ${doc.name}`);
@@ -107,8 +117,11 @@ async function main() {
 
     console.log(
       `  ${history.pages} page(s), ${history.rows.length} row(s) within the ${CUTOFF_MONTHS}-month window` +
-        (history.truncatedByCutoff ? " (stopped at cutoff)" : "") +
-        (history.truncatedBySafetyCap ? " (hit safety page cap - order was ambiguous, consider rerunning with a narrower window)" : "")
+        (history.possiblyTruncatedAt50
+          ? " - WARNING: exactly 50 rows, documenthistory's hard per-call cap. This document" +
+            " likely has more history than we can currently reach (see onshape.mjs's" +
+            " fetchDocumentHistory comment); accepted as a known Phase 1 limit."
+          : "")
     );
     totalRowsFetched += history.rows.length;
     console.log(`  API calls so far: ${onshape.callsUsed()} / ${MAX_CALLS}`);
