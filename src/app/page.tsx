@@ -56,9 +56,11 @@ export default async function TodayScreen() {
               srValue={durationSpoken(weekSoFar)}
               icon={<Icon name="bolt" size={15} className="dimmer" />}
               footnote={
-                pace === 0
-                  ? "Level with last week"
-                  : `${pace > 0 ? "+" : ""}${pace}% vs. last week's pace`
+                !hasAnyData
+                  ? "Nothing modeled yet"
+                  : pace === 0
+                    ? "Level with last week"
+                    : `${pace > 0 ? "+" : ""}${pace}% vs. last week's pace`
               }
             />
           </div>
@@ -89,7 +91,8 @@ export default async function TodayScreen() {
             </div>
             <section className="chunk" style={{ textAlign: "center" }}>
               <p className="t-footnote dim" style={{ margin: 0 }}>
-                No sessions yet. Run the backfill to pull your real Onshape history.
+                No sessions yet. Open a tracked document in Onshape and start modeling -
+                Xtrude picks it up automatically.
               </p>
             </section>
           </FlyItem>

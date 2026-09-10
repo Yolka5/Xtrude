@@ -1,10 +1,14 @@
 /**
- * Onshape API client for the one-time backfill. Not used by the running
- * app - Phase 1 is backfill-only, no live updates, so nothing here runs at
- * request time.
+ * Onshape API client. Originally backfill-only; Phase 1b also imports this
+ * (get/post/del, webhook methods) from src/app/api/cron/* routes and the
+ * webhook management script - still a plain, dependency-free module, so
+ * that works whether the caller is `node scripts/x.mjs` or Next's bundler.
  *
- * Every call goes through `get()`, which increments a shared counter so the
- * caller can enforce the 150-call backfill budget and print a running total.
+ * Every call goes through `request()`, which increments a shared counter so
+ * the caller can enforce a call budget and print a running total. Registering,
+ * listing, or unregistering a webhook costs a call like anything else here;
+ * receiving a webhook delivery does not - Onshape is calling us, not the
+ * other way round.
  */
 
 const BASE_URL = "https://cad.onshape.com/api";
@@ -19,12 +23,11 @@ export function makeClient({ accessKey, secretKey, maxCalls }) {
 
   let calls = 0;
 
-  async function get(path, params = {}) {
+  async function request(method, path, { params = {}, body } = {}) {
     if (calls >= maxCalls) {
       throw new Error(
-        `Hit the ${maxCalls}-call backfill budget before finishing ${path}. ` +
-          `Stopping here rather than risking the annual quota - rerun later ` +
-          `to continue (already-fetched events are safely stored).`
+        `Hit the ${maxCalls}-call budget before finishing ${method} ${path}. ` +
+          `Stopping here rather than risking the annual quota.`
       );
     }
     const url = new URL(`${BASE_URL}${path}`);
@@ -32,22 +35,29 @@ export function makeClient({ accessKey, secretKey, maxCalls }) {
       url.searchParams.set(key, String(value));
     }
     calls++;
-    const res = await fetch(url, { headers });
+    const res = await fetch(url, { method, headers, body: body ? JSON.stringify(body) : undefined });
     if (!res.ok) {
-      const body = await res.text().catch(() => "");
+      const responseBody = await res.text().catch(() => "");
       const hint =
         res.status === 401 || res.status === 403
-          ? "\n  401/403 usually means bad keys, or keys missing read scope on documents."
+          ? "\n  401/403 usually means bad keys, or keys missing scope for this call."
           : "";
       throw new Error(
-        `HTTP ${res.status} from ${url}\n  ${body.slice(0, 2000)}${hint}\n  (4xx/5xx do not count against the annual API quota.)`
+        `HTTP ${res.status} from ${method} ${url}\n  ${responseBody.slice(0, 2000)}${hint}\n  (4xx/5xx do not count against the annual API quota.)`
       );
     }
+    if (res.status === 204) return null;
     return res.json();
   }
 
+  const get = (path, params) => request("GET", path, { params });
+  const post = (path, body) => request("POST", path, { body });
+  const del = (path, params) => request("DELETE", path, { params });
+
   return {
     get,
+    post,
+    del,
     callsUsed: () => calls,
 
     async whoAmI() {
@@ -164,6 +174,43 @@ export function makeClient({ accessKey, secretKey, maxCalls }) {
         : items;
 
       return { rows, pages: 1, possiblyTruncatedAt50 };
+    },
+
+    /**
+     * Registers one webhook covering every event type in `events` for a
+     * single document - Onshape's createWebhook takes `events` as an array,
+     * so one registration is enough per document rather than one per event
+     * type. `isTransient: false` is load-bearing: without it, Onshape
+     * quietly cleans the registration up after a period of inactivity (see
+     * https://onshape-public.github.io/docs/app-dev/webhook/#events), which
+     * on a personal document that might go quiet for weeks would otherwise
+     * silently stop tracking with no error anywhere.
+     */
+    async registerWebhook({ documentId, events, url, collapseEvents = true }) {
+      return post("/v6/webhooks", {
+        documentId,
+        events,
+        url,
+        isTransient: false,
+        options: { collapseEvents },
+      });
+    },
+
+    /** Lists every webhook registered under this account (any document). */
+    async listWebhooks(userId) {
+      const PAGE_SIZE = 20;
+      const webhooks = [];
+      for (let offset = 0; ; offset += PAGE_SIZE) {
+        const payload = await get("/v6/webhooks", { user: userId, offset, limit: PAGE_SIZE });
+        const items = extractRows(payload);
+        webhooks.push(...items);
+        if (items.length < PAGE_SIZE) break;
+      }
+      return webhooks;
+    },
+
+    async unregisterWebhook(webhookId) {
+      return del(`/v6/webhooks/${webhookId}`, { blockNotification: false });
     },
   };
 }
