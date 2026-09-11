@@ -2,20 +2,14 @@
 
 I did not stop for these. Defaults I used are in brackets.
 
-1. **SQL** — Please run, in order, against live Supabase before you deploy this branch:
-   - `supabase/migrate-leagues.sql`
-   - `supabase/migrate-oauth.sql`
-   - `supabase/migrate-push.sql`  
-   [I could not run DDL from here.]
+1. **Company-scoped Onshape webhooks** — Docs allow `companyId` for `onshape.document.lifecycle.created` (all present and future *company-owned* documents). That needs a company admin. [Treated as unavailable on this free/EDU personal account. Discovery polling stays. See WEBHOOK-SCOPE.md.]
 
-2. **First Onshape login binds to Yoni** while `users.onshape_user_id` is still null. Confirm the first account you connect is yours. If someone else connected first, they would inherit your sessions. [Assumed you will connect first.]
+2. **`REQUIRE_AUTH=1`** — Flip only the day a link is shared. [Left unset.]
 
-3. **`REQUIRE_AUTH=1`** — When should logged-out visitors stop seeing your Today and hit `/connect/` instead? [Left unset so production cannot lock you out if this branch is deployed early.]
+3. **Rotate Supabase service role** — Do this before a second person logs in. [Not rotated from here.]
 
-4. **VAPID on Vercel** — Local `.env` has `PUSH_VAPID_PUBLIC_KEY` / `PUSH_VAPID_PRIVATE_KEY` / `PUSH_VAPID_SUBJECT` (gitignored). Add the same names on Vercel when you deploy push. Want me to copy them up in a later session, or will you paste them?
+4. **Push on a real device** — Opt-in + test send is in Profile. I could not grant the browser permission prompt from this session, so a notification actually arriving is unverified. [Code path is in; try it on preview after you deploy.]
 
-5. **Post-onboarding discover** — New users currently get 20 docs at connect time only. Should the daily Vercel cron start using each user’s OAuth token (costs ~1 list call per user per day)? [Left as Yoni + API keys.]
+5. **Preview deploy** — Task 7 asked for preview end-to-end. I did not deploy (production forbidden; preview would still be a deploy, and OAuth redirect is not registered for random preview URLs). [Local production build + secret grep instead.]
 
-6. **League name** — Default league is “Xtrude” with join code `XTRUDE`. Want a different name?
-
-7. **After midnight** — Badge counts a session that *starts* 00:00–04:59 Asia/Jerusalem. Is 05:00 still “after midnight” for you?
+6. **Existing league named “Xtrude”** — Seeded by `migrate-leagues.sql` (already run, not edited). Owners can rename it in the UI. [Left the live row as-is.]
