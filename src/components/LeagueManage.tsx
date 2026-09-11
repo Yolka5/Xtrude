@@ -1,25 +1,34 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import type { LeagueSummary } from "@/lib/db/leagues";
 
 export function LeagueManage({
   leagueId,
+  leagueName,
   joinCode,
+  isOwner,
   allLeagues,
   tablesReady,
 }: {
   leagueId: string | null;
+  leagueName: string;
   joinCode: string | null;
+  isOwner: boolean;
   allLeagues: LeagueSummary[];
   tablesReady: boolean;
 }) {
   const router = useRouter();
   const [name, setName] = useState("");
+  const [rename, setRename] = useState(leagueName);
   const [code, setCode] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    setRename(leagueName);
+  }, [leagueName]);
 
   async function post(url: string, body: object) {
     setBusy(true);
@@ -88,6 +97,45 @@ export function LeagueManage({
             Join code <strong className="num" style={{ color: "var(--label)" }}>{joinCode}</strong>
             {" · "}share it so someone else can join.
           </p>
+          {isOwner && leagueId ? (
+            <div className="stack" style={{ gap: 10, marginTop: 10 }}>
+              <form
+                className="stack"
+                style={{ gap: 8 }}
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  void post("/api/leagues/rename", { leagueId, name: rename });
+                }}
+              >
+                <label className="field">
+                  <span className="field__label">League name</span>
+                  <input
+                    className="field__input"
+                    value={rename}
+                    onChange={(e) => setRename(e.target.value)}
+                    maxLength={48}
+                    disabled={busy}
+                  />
+                </label>
+                <button
+                  type="submit"
+                  className="text-btn text-btn--strong"
+                  disabled={busy || rename.trim().length < 2 || rename.trim() === leagueName}
+                >
+                  Rename
+                </button>
+              </form>
+              <button
+                type="button"
+                className="text-btn"
+                disabled={busy}
+                onClick={() => void post("/api/leagues/regenerate-code", { leagueId })}
+                style={{ paddingLeft: 0 }}
+              >
+                New join code
+              </button>
+            </div>
+          ) : null}
           {leagueId ? (
             <button
               type="button"
@@ -127,7 +175,7 @@ export function LeagueManage({
             value={code}
             onChange={(e) => setCode(e.target.value.toUpperCase())}
             maxLength={8}
-            placeholder="XTRUDE"
+            placeholder="ABC234"
             autoCapitalize="characters"
             disabled={busy}
           />

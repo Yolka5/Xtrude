@@ -16,7 +16,9 @@ export default async function LeagueScreen({
     <LeagueContent league={league} lonely={league.memberCount <= 1}>
       <LeagueManage
         leagueId={league.id}
+        leagueName={league.name}
         joinCode={league.joinCode}
+        isOwner={league.isOwner}
         allLeagues={league.allLeagues}
         tablesReady={league.tablesReady}
       />

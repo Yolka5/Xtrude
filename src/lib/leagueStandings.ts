@@ -63,12 +63,45 @@ export type StandingInput = {
   lastWeekMinutes: number;
 };
 
+/** No 0/O, 1/I/L — easy to type on a phone. */
+export const JOIN_CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
+export const JOIN_CODE_LENGTH = 6;
+const AMBIGUOUS = /[01IOL]/;
+
 export function generateJoinCode(seed?: Uint8Array): string {
-  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-  const bytes = seed ?? crypto.getRandomValues(new Uint8Array(6));
+  const bytes = seed ?? crypto.getRandomValues(new Uint8Array(JOIN_CODE_LENGTH));
   let out = "";
-  for (let i = 0; i < 6; i++) out += alphabet[bytes[i]! % alphabet.length];
+  for (let i = 0; i < JOIN_CODE_LENGTH; i++) out += JOIN_CODE_ALPHABET[bytes[i]! % JOIN_CODE_ALPHABET.length];
   return out;
+}
+
+export function joinCodeIsUnambiguous(code: string): boolean {
+  return code.length === JOIN_CODE_LENGTH && [...code].every((ch) => JOIN_CODE_ALPHABET.includes(ch)) && !AMBIGUOUS.test(code);
+}
+
+export function allocateJoinCode(
+  taken: Set<string>,
+  randomBytes: () => Uint8Array = () => crypto.getRandomValues(new Uint8Array(JOIN_CODE_LENGTH))
+): string {
+  for (let i = 0; i < 64; i++) {
+    const code = generateJoinCode(randomBytes());
+    if (!taken.has(code)) return code;
+  }
+  throw new Error("Could not allocate a unique join code.");
+}
+
+export type LeagueIdentity = {
+  name: string;
+  joinCode: string;
+  memberIds: string[];
+};
+
+export function renameLeagueState(league: LeagueIdentity, name: string): LeagueIdentity {
+  return { ...league, name, joinCode: league.joinCode, memberIds: [...league.memberIds] };
+}
+
+export function regenerateLeagueCode(league: LeagueIdentity, nextCode: string): LeagueIdentity {
+  return { ...league, name: league.name, joinCode: nextCode, memberIds: [...league.memberIds] };
 }
 
 export function rankStandings(inputs: StandingInput[], meId: string): LeagueMember[] {

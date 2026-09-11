@@ -11,7 +11,7 @@
 import { deriveRealData } from "../src/lib/db/derive";
 import { clusterSessions, MIN_EVENTS, MIN_SPAN_MINUTES } from "./lib/sessionAlgorithm.mjs";
 import { calendarDateInZone, clockHmInZone } from "./lib/timezone.mjs";
-import { rankStandings, generateJoinCode } from "../src/lib/leagueStandings";
+import { rankStandings, generateJoinCode, JOIN_CODE_ALPHABET, JOIN_CODE_LENGTH, joinCodeIsUnambiguous, allocateJoinCode, renameLeagueState, regenerateLeagueCode } from "../src/lib/leagueStandings";
 import { decryptSecret, encryptSecret } from "../src/lib/auth/tokenCrypto";
 import { createSessionToken, readSessionUserId } from "../src/lib/auth/session";
 import { discoveryDue, whoIsDue } from "../src/lib/discoverySchedule";
@@ -298,6 +298,54 @@ check(
   generateJoinCode(new Uint8Array([0, 1, 2, 3, 4, 5])).length === 6,
   generateJoinCode(new Uint8Array([0, 1, 2, 3, 4, 5]))
 );
+check(
+  "join code alphabet has no 0/O/1/I/L",
+  ![...JOIN_CODE_ALPHABET].some((ch) => "01IOL".includes(ch)),
+  JOIN_CODE_ALPHABET
+);
+{
+  const taken = new Set<string>();
+  let n = 0;
+  const nextBytes = () => {
+    const b = new Uint8Array(JOIN_CODE_LENGTH);
+    let x = n++;
+    for (let i = 0; i < JOIN_CODE_LENGTH; i++) {
+      b[i] = x % JOIN_CODE_ALPHABET.length;
+      x = Math.floor(x / JOIN_CODE_ALPHABET.length);
+    }
+    return b;
+  };
+  for (let i = 0; i < 80; i++) {
+    taken.add(allocateJoinCode(taken, nextBytes));
+  }
+  check("allocateJoinCode yields 80 unique codes", taken.size === 80, String(taken.size));
+  check("generated join codes exclude 0O1IL", [...taken].every(joinCodeIsUnambiguous), [...taken].find((c) => !joinCodeIsUnambiguous(c)) ?? "");
+  const blocked = new Set(taken);
+  const first = [...taken][0]!;
+  const firstBytes = new Uint8Array([...first].map((ch) => JOIN_CODE_ALPHABET.indexOf(ch)));
+  let collisions = 0;
+  const collidingThenNew = () => {
+    collisions += 1;
+    if (collisions < 3) return firstBytes;
+    return nextBytes();
+  };
+  const allocated = allocateJoinCode(blocked, collidingThenNew);
+  check(
+    "allocateJoinCode skips codes already taken",
+    allocated !== first && !blocked.has(allocated) && joinCodeIsUnambiguous(allocated),
+    allocated
+  );
+}
+
+{
+  const league = { name: "Studio", joinCode: "ABC234", memberIds: ["a", "b"] };
+  const renamed = renameLeagueState(league, "Thursday night");
+  check("rename keeps the join code", renamed.joinCode === "ABC234" && renamed.name === "Thursday night", JSON.stringify(renamed));
+  check("rename keeps membership", renamed.memberIds.join(",") === "a,b", JSON.stringify(renamed.memberIds));
+  const regen = regenerateLeagueCode(renamed, "XYZ789");
+  check("regenerating the code does not rename", regen.name === "Thursday night" && regen.joinCode === "XYZ789", JSON.stringify(regen));
+  check("regenerating the code keeps membership", regen.memberIds.join(",") === "a,b", JSON.stringify(regen.memberIds));
+}
 
 {
   const nineMin: Parameters<typeof deriveRealData>[0] = [{

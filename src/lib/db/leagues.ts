@@ -14,6 +14,7 @@ export type LeagueSummary = { id: string; name: string; joinCode: string };
 export type LeagueView = League & {
   id: string | null;
   joinCode: string | null;
+  isOwner: boolean;
   allLeagues: LeagueSummary[];
   tablesReady: boolean;
 };
@@ -91,20 +92,21 @@ async function soloFromUser(userId: string): Promise<LeagueView> {
   );
   return {
     id: null,
-    name: "Xtrude",
+    name: person.display_name || "League",
     memberCount: 1,
     daysElapsed,
     members,
     joinCode: null,
+    isOwner: false,
     allLeagues: [],
     tablesReady: false,
   };
 }
 
 /**
- * The league the current user should see. Prefers the oldest membership
- * (the default "Xtrude" league for Yoni). If `leagues` hasn't been migrated
- * yet, synthesizes a one-person board from real sessions so the screen
+ * The league the current user should see. Prefers the oldest membership.
+ * If `leagues` hasn't been migrated yet, synthesizes a one-person board
+ * named after the owner (never a hardcoded product name) so the screen
  * stays honest instead of 500ing or falling back to fixture names.
  */
 export async function getLeagueView(userId: string, leagueId?: string | null): Promise<LeagueView> {
@@ -113,7 +115,7 @@ export async function getLeagueView(userId: string, leagueId?: string | null): P
 
   const membership = await sb
     .from("league_members")
-    .select("league_id, joined_at, leagues(id, name, join_code)")
+    .select("league_id, joined_at, leagues(id, name, join_code, created_by)")
     .eq("user_id", userId)
     .order("joined_at", { ascending: true });
 
@@ -127,7 +129,7 @@ export async function getLeagueView(userId: string, leagueId?: string | null): P
 
   const summaries: LeagueSummary[] = [];
   for (const row of rows) {
-    const league = row.leagues as { id: string; name: string; join_code: string } | null;
+    const league = row.leagues as { id: string; name: string; join_code: string; created_by: string } | null;
     if (!league) continue;
     summaries.push({ id: league.id, name: league.name, joinCode: league.join_code });
   }
@@ -135,6 +137,11 @@ export async function getLeagueView(userId: string, leagueId?: string | null): P
 
   const active =
     (leagueId && summaries.find((l) => l.id === leagueId)) || summaries[0];
+  const activeRow = rows.find((row) => {
+    const league = row.leagues as { id: string } | null;
+    return league?.id === active.id;
+  });
+  const createdBy = (activeRow?.leagues as { created_by?: string } | null)?.created_by;
 
   const membersRes = await sb
     .from("league_members")
@@ -167,6 +174,7 @@ export async function getLeagueView(userId: string, leagueId?: string | null): P
     daysElapsed,
     members,
     joinCode: active.joinCode,
+    isOwner: createdBy === userId,
     allLeagues: summaries,
     tablesReady: true,
   };
@@ -229,3 +237,51 @@ export async function leaveLeague(userId: string, leagueId: string): Promise<voi
     throw new Error(error.message);
   }
 }
+
+async function requireOwnedLeague(userId: string, leagueId: string) {
+  const sb = getSupabase();
+  const { data, error } = await sb
+    .from("leagues")
+    .select("id, name, join_code, created_by")
+    .eq("id", leagueId)
+    .maybeSingle();
+  if (error) {
+    if (isMissingTable(error.message)) throw new Error("Run supabase/migrate-leagues.sql first.");
+    throw new Error(error.message);
+  }
+  if (!data) throw new Error("League not found.");
+  if (data.created_by !== userId) throw new Error("Only the owner can do that.");
+  return data;
+}
+
+export async function renameLeague(
+  userId: string,
+  leagueId: string,
+  rawName: string
+): Promise<{ id: string; name: string; joinCode: string }> {
+  const name = rawName.trim().slice(0, 48);
+  if (name.length < 2) throw new Error("Name needs at least 2 characters.");
+  const league = await requireOwnedLeague(userId, leagueId);
+  const { error } = await getSupabase().from("leagues").update({ name }).eq("id", leagueId);
+  if (error) throw new Error(error.message);
+  return { id: leagueId, name, joinCode: league.join_code as string };
+}
+
+export async function regenerateLeagueJoinCode(
+  userId: string,
+  leagueId: string
+): Promise<{ id: string; joinCode: string }> {
+  await requireOwnedLeague(userId, leagueId);
+  const sb = getSupabase();
+  for (let attempt = 0; attempt < 6; attempt++) {
+    const joinCode = generateJoinCode();
+    const { error } = await sb.from("leagues").update({ join_code: joinCode }).eq("id", leagueId);
+    if (error) {
+      if (/duplicate|unique/i.test(error.message)) continue;
+      throw new Error(error.message);
+    }
+    return { id: leagueId, joinCode };
+  }
+  throw new Error("Could not allocate a join code.");
+}
+
