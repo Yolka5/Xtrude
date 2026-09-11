@@ -33,6 +33,23 @@ export async function getRealData(): Promise<RealData> {
   return deriveRealData(sessionsRes.data ?? [], dailyRes.data ?? [], docNameById, todayMs);
 }
 
+/** Whether the current viewer is bound to an Onshape account. Used by Today
+ * so a first-run empty state can ask them to connect vs go model. */
+export async function hasOnshapeBinding(): Promise<boolean> {
+  const userId = await getCurrentUserId();
+  try {
+    const { data, error } = await getSupabase()
+      .from("users")
+      .select("onshape_user_id")
+      .eq("id", userId)
+      .maybeSingle();
+    if (error) return false;
+    return Boolean(data?.onshape_user_id);
+  } catch {
+    return false;
+  }
+}
+
 /** `app_state.last_sync.updated_at`, or null if it has never run. Used by
  * Today to decide whether to fire a background sync without blocking render. */
 export async function getLastSyncAt(): Promise<number | null> {
