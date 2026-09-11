@@ -8,6 +8,7 @@ import { snapshotStreak } from "../../../../../scripts/lib/streakSnapshot.mjs";
 import { requireEnv } from "@/lib/env";
 import { cronAuthorized, unauthorizedCron } from "@/lib/cronAuth";
 import { APP_USER_ID } from "../../../../../scripts/lib/appUser.mjs";
+import { maybeSendPushReminders } from "@/lib/push/reminders";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -192,6 +193,12 @@ async function handle(req: NextRequest) {
   }
 
   summary.callsUsed = onshape.callsUsed();
+  try {
+    (summary as { push?: unknown }).push = await maybeSendPushReminders(now);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    summary.errors.push(`push: ${message}`);
+  }
   await supabase.from("app_state").upsert({ key: "last_discovery", value: summary, updated_at: now.toISOString() });
 
   return NextResponse.json({ ok: summary.errors.length === 0, ...summary });

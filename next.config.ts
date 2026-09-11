@@ -12,6 +12,7 @@ const nextConfig: NextConfig = {
   trailingSlash: true,
   // Off so POST /api/webhooks/onshape is not 308'd (see src/proxy.ts).
   skipTrailingSlashRedirect: true,
+  serverExternalPackages: ["web-push"],
 };
 
 export default nextConfig;

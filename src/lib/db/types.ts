@@ -6,6 +6,8 @@ export interface UserRow {
   display_name: string;
   initials: string;
   avatar_color: string;
+  notify_streak?: boolean;
+  notify_league?: boolean;
   created_at: string;
 }
 

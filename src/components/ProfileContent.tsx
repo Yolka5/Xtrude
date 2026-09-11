@@ -13,6 +13,7 @@ import { duration, plural, shortDate } from "@/lib/format";
 import { haptics } from "@/lib/haptics";
 import { burstAt, celebrate } from "@/lib/confetti";
 import { ProfileIdentity } from "@/components/ProfileIdentity";
+import { NotificationSettings } from "@/components/NotificationSettings";
 
 const PRISM_CONFETTI = ["#9e74e7", "#f04cf0", "#ff52a8"];
 
@@ -209,6 +210,7 @@ export function ProfileContent({
         <p className="t-caption dimmer" style={{ margin: "12px 4px 0", textAlign: "center" }}>
           <a href="/api/auth/logout" className="t-caption" style={{ color: "inherit" }}>Sign out</a>
         </p>
+        <NotificationSettings />
       </FlyItem>
     </main>
   );

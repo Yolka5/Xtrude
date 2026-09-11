@@ -9,6 +9,7 @@ import { Icon } from "@/components/Icon";
 import { getLastSyncAt, getRealData } from "@/lib/db/queries";
 import { duration, durationSpoken, longDate, plural, splitDuration } from "@/lib/format";
 import { BackgroundSync } from "@/components/BackgroundSync";
+import { PushPrompt } from "@/components/PushPrompt";
 import { PAGE_SYNC_MAX_AGE_MS } from "@/lib/pageSync";
 
 export const dynamic = "force-dynamic"; // always today's real numbers, never cached stale
@@ -53,6 +54,10 @@ export default async function TodayScreen({
             freezeBank={streak.freezeBank}
             lastFreezeUsed={streak.lastFreezeUsed}
           />
+        </FlyItem>
+
+        <FlyItem>
+          <PushPrompt ready={hasAnyData && streak.current >= 1} />
         </FlyItem>
 
         {/* Supporting stats - deliberately quieter than the hero */}
