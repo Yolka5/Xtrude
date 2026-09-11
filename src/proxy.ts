@@ -16,13 +16,15 @@ import { readSessionUserId, SESSION_COOKIE } from "@/lib/auth/session";
  *
  * Auth: REQUIRE_AUTH=1 sends visitors without a session cookie to /connect/.
  * Default is off so Yoni's account keeps working with the APP_USER_ID
- * fallback until OAuth is confirmed. Webhooks, crons, and the OAuth
- * endpoints stay public either way.
+ * fallback until OAuth is confirmed. Webhooks, crons, OAuth, and /admin
+ * (the only liveness tripwire) stay reachable either way. A missing
+ * session must redirect, never 500.
  */
 
-function isPublicPath(pathname: string): boolean {
+export function isPublicPath(pathname: string): boolean {
   const path = pathname.length > 1 ? pathname.replace(/\/+$/, "") || "/" : pathname;
   if (path === "/connect") return true;
+  if (path === "/admin") return true;
   if (path.startsWith("/api/auth")) return true;
   if (path.startsWith("/api/webhooks")) return true;
   if (path.startsWith("/api/cron")) return true;
@@ -41,10 +43,15 @@ export async function proxy(request: NextRequest) {
   }
 
   if (process.env.REQUIRE_AUTH === "1" && !isPublicPath(pathname)) {
-    const userId = await readSessionUserId(
-      request.cookies.get(SESSION_COOKIE)?.value,
-      getAuthSecret()
-    );
+    let userId: string | null = null;
+    try {
+      userId = await readSessionUserId(
+        request.cookies.get(SESSION_COOKIE)?.value,
+        getAuthSecret()
+      );
+    } catch {
+      userId = null;
+    }
     if (!userId) {
       const url = request.nextUrl.clone();
       url.pathname = "/connect/";

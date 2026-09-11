@@ -14,6 +14,8 @@ import { calendarDateInZone, clockHmInZone, isAfterMidnightWindow } from "./lib/
 import { rankStandings, generateJoinCode, JOIN_CODE_ALPHABET, JOIN_CODE_LENGTH, joinCodeIsUnambiguous, allocateJoinCode, renameLeagueState, regenerateLeagueCode } from "../src/lib/leagueStandings";
 import { decryptSecret, encryptSecret } from "../src/lib/auth/tokenCrypto";
 import { createSessionToken, readSessionUserId } from "../src/lib/auth/session";
+import { proxy, isPublicPath } from "../src/proxy";
+import { NextRequest } from "next/server";
 import { discoveryDue, whoIsDue } from "../src/lib/discoverySchedule";
 import { applyOnshapeLogin, canRebindOnshapeId, sessionsFor, type UserDataStore } from "../src/lib/auth/bindUser";
 
@@ -540,6 +542,39 @@ void (async () => {
   check("session cookie rejects a missing secret", (await readSessionUserId(tok, undefined)) === null, "");
   const tampered = tok.slice(0, -3) + "aaa";
   check("session cookie rejects tampering", (await readSessionUserId(tampered, secret)) === null, "");
+
+  const prevAuth = process.env.REQUIRE_AUTH;
+  process.env.REQUIRE_AUTH = "1";
+  try {
+    const loggedOut = (path: string) => new NextRequest(new URL(path, "http://localhost:3000"));
+    let sessionsRes: Response | null = null;
+    let threw = false;
+    try {
+      sessionsRes = await proxy(loggedOut("/sessions/"));
+    } catch {
+      threw = true;
+    }
+    check(
+      "REQUIRE_AUTH=1 sends a logged-out /sessions/ to /connect/ rather than erroring",
+      !threw && sessionsRes != null && sessionsRes.status >= 300 && sessionsRes.status < 400 && (sessionsRes.headers.get("location") ?? "").includes("/connect"),
+      `threw=${threw} status=${sessionsRes?.status} loc=${sessionsRes?.headers.get("location")}`
+    );
+    const homeRes = await proxy(loggedOut("/"));
+    check(
+      "REQUIRE_AUTH=1 sends a logged-out / to /connect/",
+      homeRes.status >= 300 && homeRes.status < 400 && (homeRes.headers.get("location") ?? "").includes("/connect"),
+      `status=${homeRes.status} loc=${homeRes.headers.get("location")}`
+    );
+    const adminRes = await proxy(loggedOut("/admin/"));
+    check(
+      "REQUIRE_AUTH=1 still lets the owner reach /admin",
+      adminRes.status < 300 && !(adminRes.headers.get("location") ?? "").includes("/connect") && isPublicPath("/admin/"),
+      `status=${adminRes.status} loc=${adminRes.headers.get("location")}`
+    );
+  } finally {
+    if (prevAuth === undefined) delete process.env.REQUIRE_AUTH;
+    else process.env.REQUIRE_AUTH = prevAuth;
+  }
 
   console.log(failures ? `\n${failures} check(s) FAILED` : "\nAll checks pass.");
   process.exit(failures ? 1 : 0);
