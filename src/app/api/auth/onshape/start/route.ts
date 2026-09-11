@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { randomBytes } from "node:crypto";
 import { onshapeCallbackUrl, ONSHAPE_AUTHORIZE_URL, ONSHAPE_SCOPES } from "@/lib/auth/onshape";
 import { STATE_COOKIE } from "@/lib/auth/session";
+import { INVITE_COOKIE, inviteCodeFromNext, inviteCookieOptions } from "@/lib/invite";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -31,5 +32,9 @@ export async function GET(req: NextRequest) {
     path: "/",
     maxAge: 10 * 60,
   });
+  const invite = inviteCodeFromNext(req.nextUrl.searchParams.get("next"));
+  if (invite) {
+    res.cookies.set(INVITE_COOKIE, invite, inviteCookieOptions(origin.startsWith("https")));
+  }
   return res;
 }

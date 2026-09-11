@@ -24,6 +24,7 @@ import { readSessionUserId, SESSION_COOKIE } from "@/lib/auth/session";
 export function isPublicPath(pathname: string): boolean {
   const path = pathname.length > 1 ? pathname.replace(/\/+$/, "") || "/" : pathname;
   if (path === "/connect") return true;
+  if (path === "/join") return true;
   if (path === "/admin") return true;
   if (path.startsWith("/api/auth")) return true;
   if (path.startsWith("/api/webhooks")) return true;

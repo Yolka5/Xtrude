@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { FlyItem } from "@/components/FlyItem";
 import { Icon } from "@/components/Icon";
+import { oauthStartPath, inviteCodeFromNext } from "@/lib/invite";
 
 export const dynamic = "force-dynamic";
 
@@ -19,10 +20,12 @@ const ERRORS: Record<string, string> = {
 export default async function ConnectPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{ error?: string; next?: string }>;
 }) {
-  const { error } = await searchParams;
+  const { error, next } = await searchParams;
   const message = error ? ERRORS[error] ?? "Something went wrong signing in." : null;
+  const startHref = oauthStartPath(next ?? null);
+  const invited = Boolean(inviteCodeFromNext(next ?? null));
 
   return (
     <main className="screen">
@@ -41,7 +44,7 @@ export default async function ConnectPage({
             <ul className="t-footnote dim" style={{ margin: 0, paddingLeft: 18, display: "grid", gap: 6 }}>
               <li>See what you modeled today, not what you meant to.</li>
               <li>We register webhooks on your 20 most recently modified documents.</li>
-              <li>You land on Today. Tracking starts from that moment.</li>
+              <li>{invited ? "After you connect, you land in the league you were invited to." : "You land on Today. Tracking starts from that moment."}</li>
             </ul>
             {message ? (
               <p className="t-footnote" style={{ margin: 0, color: "var(--neg, #b42318)" }}>
@@ -49,7 +52,7 @@ export default async function ConnectPage({
               </p>
             ) : null}
             <Link
-              href="/api/auth/onshape/start"
+              href={startHref}
               className="text-btn text-btn--strong"
               style={{
                 display: "inline-flex",

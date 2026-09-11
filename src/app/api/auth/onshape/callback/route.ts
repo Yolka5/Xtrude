@@ -14,6 +14,8 @@ import {
 import { storeOnshapeTokens } from "@/lib/auth/tokens";
 import { upsertUserFromOnshape } from "@/lib/auth/upsertUser";
 import { maybeOnboardUser } from "@/lib/onboarding";
+import { joinLeagueByCode } from "@/lib/db/leagues";
+import { INVITE_COOKIE, invitePath, parseInviteCode } from "@/lib/invite";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -96,9 +98,19 @@ export async function GET(req: NextRequest) {
   }
 
   const session = await createSessionToken(user.id, secret);
-  const dest = new URL(onboarded ? "/?onboarded=1" : "/", req.nextUrl.origin);
+  const invite = parseInviteCode(req.cookies.get(INVITE_COOKIE)?.value);
+  let dest = new URL(onboarded ? "/?onboarded=1" : "/", req.nextUrl.origin);
+  if (invite) {
+    try {
+      const joined = await joinLeagueByCode(user.id, invite);
+      dest = new URL(`/league/?league=${joined.id}`, req.nextUrl.origin);
+    } catch {
+      dest = new URL(invitePath(invite), req.nextUrl.origin);
+    }
+  }
   const res = NextResponse.redirect(dest);
   res.cookies.set(SESSION_COOKIE, session, sessionCookieOptions(req.nextUrl.protocol === "https:"));
   res.cookies.set(STATE_COOKIE, "", { path: "/", maxAge: 0 });
+  res.cookies.set(INVITE_COOKIE, "", { path: "/", maxAge: 0 });
   return res;
 }

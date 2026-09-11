@@ -3,6 +3,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import type { LeagueSummary } from "@/lib/db/leagues";
+import { invitePath } from "@/lib/invite";
 
 export function LeagueManage({
   leagueId,
@@ -25,10 +26,17 @@ export function LeagueManage({
   const [code, setCode] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [shareUrl, setShareUrl] = useState(joinCode ? invitePath(joinCode) : "");
 
   useEffect(() => {
     setRename(leagueName);
   }, [leagueName]);
+
+  useEffect(() => {
+    if (!joinCode) return;
+    setShareUrl(`${window.location.origin}${invitePath(joinCode)}`);
+  }, [joinCode]);
 
   async function post(url: string, body: object) {
     setBusy(true);
@@ -95,8 +103,30 @@ export function LeagueManage({
         <section className="chunk chunk-sm">
           <p className="t-footnote dim" style={{ margin: 0 }}>
             Join code <strong className="num" style={{ color: "var(--label)" }}>{joinCode}</strong>
-            {" · "}share it so someone else can join.
+            {" · "}share the code, or this link:
           </p>
+          <div className="row" style={{ gap: 8, marginTop: 10, flexWrap: "wrap", alignItems: "center" }}>
+            <code className="t-footnote" style={{ margin: 0, wordBreak: "break-all", color: "var(--label)" }}>
+              {shareUrl}
+            </code>
+            <button
+              type="button"
+              className="text-btn text-btn--strong"
+              disabled={busy}
+              onClick={() => {
+                const url = `${window.location.origin}${invitePath(joinCode)}`;
+                void navigator.clipboard.writeText(url).then(() => {
+                  setCopied(true);
+                  window.setTimeout(() => setCopied(false), 1600);
+                }).catch(() => {
+                  /* clipboard permission denied — the path is still visible */
+                });
+              }}
+              style={{ paddingLeft: 0 }}
+            >
+              {copied ? "Copied" : "Copy invite link"}
+            </button>
+          </div>
           {isOwner && leagueId ? (
             <div className="stack" style={{ gap: 10, marginTop: 10 }}>
               <form
