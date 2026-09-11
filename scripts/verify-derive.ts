@@ -280,6 +280,64 @@ check(
 );
 
 {
+  const nineMin: Parameters<typeof deriveRealData>[0] = [{
+    id: "short",
+    started_at: "2026-09-08T12:00:00Z",
+    ended_at: "2026-09-08T12:09:00Z",
+    raw_minutes: 9,
+    scored_minutes: 9,
+    event_count: 3,
+    document_ids: ["doc1"],
+  }];
+  const nine = deriveRealData(nineMin, [{ date: "2026-09-08", total_scored_minutes: 9, session_count: 1 }], docNameById, TODAY_MS);
+  check("9 scored minutes is not a streak day", nine.streak.current === 0 && nine.streak.longest === 0, JSON.stringify(nine.streak));
+}
+
+{
+  const freezeRows: Parameters<typeof deriveRealData>[0] = [];
+  let fid = 1;
+  function freezeSession(dayOffset: number, minutes: number) {
+    const start = new Date(TODAY_MS + dayOffset * DAY);
+    start.setUTCHours(14, 0, 0, 0);
+    const end = new Date(start.getTime() + minutes * 60_000);
+    freezeRows.push({
+      id: `f${fid++}`,
+      started_at: start.toISOString(),
+      ended_at: end.toISOString(),
+      raw_minutes: minutes,
+      scored_minutes: minutes,
+      event_count: 4,
+      document_ids: ["doc1"],
+    });
+  }
+  for (let back = 9; back >= 3; back--) freezeSession(-back, 12);
+  freezeSession(-1, 12);
+  const freezeDaily: Parameters<typeof deriveRealData>[1] = [];
+  {
+    const byDate = new Map<string, { total_scored_minutes: number; session_count: number }>();
+    for (const s of freezeRows) {
+      const date = s.started_at.slice(0, 10);
+      const e = byDate.get(date) ?? { total_scored_minutes: 0, session_count: 0 };
+      e.total_scored_minutes += s.scored_minutes;
+      e.session_count += 1;
+      byDate.set(date, e);
+    }
+    for (const [date, v] of byDate) freezeDaily.push({ date, ...v });
+  }
+  const frozen = deriveRealData(freezeRows, freezeDaily, docNameById, TODAY_MS);
+  check(
+    "freeze saves a missed day instead of silently dropping the streak",
+    frozen.streak.current === 9 && frozen.streak.lastFreezeUsed === "2026-09-07",
+    JSON.stringify(frozen.streak)
+  );
+  check(
+    "a used freeze is reported, never hidden",
+    frozen.streak.freezeUsedDates.includes("2026-09-07"),
+    JSON.stringify(frozen.streak.freezeUsedDates)
+  );
+}
+
+{
   const secret = "x".repeat(32);
   const cipher = encryptSecret("onshape-access-token", secret);
   check("oauth token encrypt roundtrip", decryptSecret(cipher, secret) === "onshape-access-token", "");

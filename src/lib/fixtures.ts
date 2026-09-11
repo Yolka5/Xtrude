@@ -106,6 +106,9 @@ export type StreakStats = {
   weekDaysElapsed: number;
   /** The equivalent full Monday-Sunday total for last week. */
   lastWeekMinutes: number;
+  freezeBank: number;
+  freezeUsedDates: string[];
+  lastFreezeUsed: string | null;
 };
 
 export type ProfileStats = {
@@ -1796,7 +1799,10 @@ export const STREAK: StreakStats = {
   "longest": 26,
   "weekMinutes": 90,
   "weekDaysElapsed": 3,
-  "lastWeekMinutes": 223
+  "lastWeekMinutes": 223,
+  "freezeBank": 1,
+  "freezeUsedDates": [],
+  "lastFreezeUsed": null
 };
 
 export const PROFILE: ProfileStats = {

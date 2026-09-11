@@ -7,6 +7,7 @@ import { CountUp } from "./CountUp";
 import { TiltHero } from "./TiltHero";
 import { haptics } from "@/lib/haptics";
 import { burstAt } from "@/lib/confetti";
+import { shortDate } from "@/lib/format";
 
 /**
  * Today's hero: fire, at full strength - a streak is a flame, the colour IS
@@ -19,7 +20,17 @@ import { burstAt } from "@/lib/confetti";
  * Reduce Motion switches off; the tap still registers, it just doesn't do
  * the burst.
  */
-export function StreakHero({ current, longest }: { current: number; longest: number }) {
+export function StreakHero({
+  current,
+  longest,
+  freezeBank = 0,
+  lastFreezeUsed = null,
+}: {
+  current: number;
+  longest: number;
+  freezeBank?: number;
+  lastFreezeUsed?: string | null;
+}) {
   const reduced = useReducedMotion();
   // Fixtures never hit current >= longest (they were hand-tuned so there was
   // always a record left to chase); real data eventually will, the moment a
@@ -153,6 +164,26 @@ export function StreakHero({ current, longest }: { current: number; longest: num
           {neverStarted ? "Start your streak" : atRecord ? "New record" : `${toBeat} to beat it`}
         </span>
       </div>
+
+      {lastFreezeUsed || freezeBank > 0 ? (
+        <>
+          <div className="hero-rule" />
+          <div className="spread">
+            <span className="t-footnote hero-sub">
+              {lastFreezeUsed ? (
+                <>Freeze used {shortDate(lastFreezeUsed)} — your streak would have broken</>
+              ) : (
+                <>{freezeBank === 1 ? "1 freeze banked" : `${freezeBank} freezes banked`}</>
+              )}
+            </span>
+            {lastFreezeUsed ? (
+              <span className="hero-chip">
+                {freezeBank === 0 ? "No freezes left" : freezeBank === 1 ? "1 left" : `${freezeBank} left`}
+              </span>
+            ) : null}
+          </div>
+        </>
+      ) : null}
     </TiltHero>
   );
 }

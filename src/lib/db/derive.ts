@@ -29,6 +29,7 @@ import type {
   Badge,
 } from "@/lib/fixtures";
 import { calendarDateInZone, clockHmInZone } from "../../../scripts/lib/timezone.mjs";
+import { computeStreakAndFreezes } from "../../../scripts/lib/streakMath.mjs";
 
 const DAY_MS = 86_400_000;
 
@@ -125,27 +126,16 @@ export function deriveRealData(
   }
   const byDate = new Map(daily.map((d) => [d.date, d]));
 
-  // --- streak ---------------------------------------------------------------
-  let currentStreak = 0;
-  {
-    const todayActive = (byDate.get(today)?.sessions ?? 0) > 0;
-    let cursor = todayActive ? today : addDaysIso(today, -1);
-    for (;;) {
-      const d = byDate.get(cursor);
-      if (d && d.sessions > 0) {
-        currentStreak++;
-        cursor = addDaysIso(cursor, -1);
-      } else break;
-    }
-  }
-  let longestStreak = 0;
-  {
-    let run = 0;
-    for (const d of daily) {
-      run = d.sessions > 0 ? run + 1 : 0;
-      longestStreak = Math.max(longestStreak, run);
-    }
-  }
+  const {
+    current: currentStreak,
+    longest: longestStreak,
+    freezeBank,
+    freezeUsedDates,
+    lastFreezeUsed,
+  } = computeStreakAndFreezes(
+    daily.map((d) => ({ date: d.date, scoredMinutes: d.scoredMinutes })),
+    today
+  );
 
   // --- this week, Monday-anchored in Asia/Jerusalem civil dates -------------
   const mondayOffset = mondayIndexedDowFromDate(today);
@@ -272,7 +262,16 @@ export function deriveRealData(
     daily,
     week,
     todayStats,
-    streak: { current: currentStreak, longest: longestStreak, weekMinutes, weekDaysElapsed: mondayOffset + 1, lastWeekMinutes },
+    streak: {
+      current: currentStreak,
+      longest: longestStreak,
+      weekMinutes,
+      weekDaysElapsed: mondayOffset + 1,
+      lastWeekMinutes,
+      freezeBank,
+      freezeUsedDates,
+      lastFreezeUsed,
+    },
     profile,
     records,
     badges,

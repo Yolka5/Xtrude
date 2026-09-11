@@ -47,7 +47,12 @@ export default async function TodayScreen({
         </FlyItem>
 
         <FlyItem>
-          <StreakHero current={streak.current} longest={streak.longest} />
+          <StreakHero
+            current={streak.current}
+            longest={streak.longest}
+            freezeBank={streak.freezeBank}
+            lastFreezeUsed={streak.lastFreezeUsed}
+          />
         </FlyItem>
 
         {/* Supporting stats - deliberately quieter than the hero */}
