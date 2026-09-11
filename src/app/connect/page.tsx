@@ -38,6 +38,11 @@ export default async function ConnectPage({
               Connect your Onshape account. Xtrude watches the documents you touch
               and turns real edits into sessions, streaks, and a league.
             </p>
+            <ul className="t-footnote dim" style={{ margin: 0, paddingLeft: 18, display: "grid", gap: 6 }}>
+              <li>See what you modeled today, not what you meant to.</li>
+              <li>We register webhooks on your 20 most recently modified documents.</li>
+              <li>You land on Today. Tracking starts from that moment.</li>
+            </ul>
             {message ? (
               <p className="t-footnote" style={{ margin: 0, color: "var(--neg, #b42318)" }}>
                 {message}

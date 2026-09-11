@@ -8,20 +8,21 @@
  * actually ended yet, then have to un-write it next hour.
  *
  * Always a full wipe-and-rebuild for this user rather than an incremental
- * merge. Scoped to APP_USER_ID so a second user's rows are never cleared.
+ * merge. Defaults to APP_USER_ID so existing crons stay scoped to Yoni;
+ * onboarding passes the new user's id so we never wipe someone else's rows.
  */
 import { clusterSessions, IDLE_THRESHOLD_MINUTES } from "./sessionAlgorithm.mjs";
 import { calendarDateInZone } from "./timezone.mjs";
 import { APP_USER_ID } from "./appUser.mjs";
 
-async function fetchAllEvents(supabase) {
+async function fetchAllEvents(supabase, userId) {
   const PAGE = 1000;
   const events = [];
   for (let from = 0; ; from += PAGE) {
     const { data, error } = await supabase
       .from("events")
       .select("occurred_at, tracked_documents(onshape_document_id)")
-      .eq("user_id", APP_USER_ID)
+      .eq("user_id", userId)
       .order("occurred_at", { ascending: true })
       .range(from, from + PAGE - 1);
     if (error) throw new Error(`fetching events: ${error.message}`);
@@ -39,10 +40,10 @@ async function fetchAllEvents(supabase) {
 
 /**
  * @param {*} supabase
- * @param {{ excludeLiveTail?: boolean, now?: Date }} [opts]
+ * @param {{ excludeLiveTail?: boolean, now?: Date, userId?: string }} [opts]
  */
-export async function rebuildSessions(supabase, { excludeLiveTail = false, now = new Date() } = {}) {
-  const events = await fetchAllEvents(supabase);
+export async function rebuildSessions(supabase, { excludeLiveTail = false, now = new Date(), userId = APP_USER_ID } = {}) {
+  const events = await fetchAllEvents(supabase, userId);
 
   let clusters = events.length ? clusterSessions(events) : [];
   let excludedLiveTail = false;
@@ -59,7 +60,7 @@ export async function rebuildSessions(supabase, { excludeLiveTail = false, now =
   const dropped = clusters.length - kept.length;
 
   const sessionRows = kept.map((s) => ({
-    user_id: APP_USER_ID,
+    user_id: userId,
     started_at: s.startedAt,
     ended_at: s.endedAt,
     duration_seconds: Math.round(s.durationSeconds),
@@ -78,15 +79,15 @@ export async function rebuildSessions(supabase, { excludeLiveTail = false, now =
     dailyMap.set(date, entry);
   }
   const dailyRows = [...dailyMap.entries()].map(([date, v]) => ({
-    user_id: APP_USER_ID,
+    user_id: userId,
     date,
     total_scored_minutes: Math.round(v.total_scored_minutes * 100) / 100,
     session_count: v.session_count,
   }));
 
-  const { error: delSessionsErr } = await supabase.from("sessions").delete().eq("user_id", APP_USER_ID);
+  const { error: delSessionsErr } = await supabase.from("sessions").delete().eq("user_id", userId);
   if (delSessionsErr) throw new Error(`clearing sessions: ${delSessionsErr.message}`);
-  const { error: delDailyErr } = await supabase.from("daily_stats").delete().eq("user_id", APP_USER_ID);
+  const { error: delDailyErr } = await supabase.from("daily_stats").delete().eq("user_id", userId);
   if (delDailyErr) throw new Error(`clearing daily_stats: ${delDailyErr.message}`);
 
   const CHUNK = 500;

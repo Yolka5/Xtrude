@@ -47,11 +47,11 @@ export function streakFromDaily(dailyRows, now = new Date()) {
   return { current, longest, asOf: today, computedAt: now.toISOString() };
 }
 
-export async function snapshotStreak(supabase, now = new Date()) {
+export async function snapshotStreak(supabase, now = new Date(), userId = APP_USER_ID) {
   const { data, error } = await supabase
     .from("daily_stats")
     .select("date, session_count")
-    .eq("user_id", APP_USER_ID)
+    .eq("user_id", userId)
     .order("date", { ascending: true });
   if (error) throw new Error(`loading daily_stats for streak: ${error.message}`);
   return streakFromDaily(data ?? [], now);

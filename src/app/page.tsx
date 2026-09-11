@@ -13,12 +13,19 @@ import { PAGE_SYNC_MAX_AGE_MS } from "@/lib/pageSync";
 
 export const dynamic = "force-dynamic"; // always today's real numbers, never cached stale
 
-export default async function TodayScreen() {
-  const [{ today, todayStats, streak, week, sessions, hasAnyData }, lastSyncAt] = await Promise.all([
+export default async function TodayScreen({
+  searchParams,
+}: {
+  searchParams: Promise<{ onboarded?: string }>;
+}) {
+  const [{ today, todayStats, streak, week, sessions, hasAnyData }, lastSyncAt, params] = await Promise.all([
     getRealData(),
     getLastSyncAt(),
+    searchParams,
   ]);
-  const needsSync = lastSyncAt === null || Date.now() - lastSyncAt > PAGE_SYNC_MAX_AGE_MS;
+  const needsSync =
+    params.onboarded !== "1" &&
+    (lastSyncAt === null || Date.now() - lastSyncAt > PAGE_SYNC_MAX_AGE_MS);
   const todaySplit = splitDuration(todayStats.scoredMinutes);
   const mostRecent = sessions[0];
   const weekSoFar = streak.weekMinutes;
@@ -98,8 +105,9 @@ export default async function TodayScreen() {
             </div>
             <section className="chunk" style={{ textAlign: "center" }}>
               <p className="t-footnote dim" style={{ margin: 0 }}>
-                No sessions yet. Open a tracked document in Onshape and start modeling -
-                Xtrude picks it up automatically.
+                {params.onboarded === "1"
+                  ? "Tracking starts now. Open Onshape and model — sessions show up here after you save."
+                  : "No sessions yet. Open a tracked document in Onshape and start modeling - Xtrude picks it up automatically."}
               </p>
             </section>
           </FlyItem>

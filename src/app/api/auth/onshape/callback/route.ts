@@ -13,6 +13,7 @@ import {
 } from "@/lib/auth/onshape";
 import { storeOnshapeTokens } from "@/lib/auth/tokens";
 import { upsertUserFromOnshape } from "@/lib/auth/upsertUser";
+import { maybeOnboardUser } from "@/lib/onboarding";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -81,8 +82,21 @@ export async function GET(req: NextRequest) {
     return fail(req, "token_store");
   }
 
+  let onboarded = user.created;
+  try {
+    const onboard = await maybeOnboardUser(user.id);
+    if (onboard) {
+      onboarded = true;
+      console.log(
+        `onboard user ${user.id}: docs=${onboard.documentsAdded} history=${onboard.historiesPulled} webhooks=${onboard.webhooksRegistered} calls=${onboard.callsUsed} errors=${onboard.errors.length}`
+      );
+    }
+  } catch (err) {
+    console.error("onboarding failed:", err instanceof Error ? err.message : err);
+  }
+
   const session = await createSessionToken(user.id, secret);
-  const dest = new URL(user.created ? "/?onboarded=1" : "/", req.nextUrl.origin);
+  const dest = new URL(onboarded ? "/?onboarded=1" : "/", req.nextUrl.origin);
   const res = NextResponse.redirect(dest);
   res.cookies.set(SESSION_COOKIE, session, sessionCookieOptions(req.nextUrl.protocol === "https:"));
   res.cookies.set(STATE_COOKIE, "", { path: "/", maxAge: 0 });
