@@ -29,7 +29,7 @@ import type {
   Badge,
 } from "@/lib/fixtures";
 import { calendarDateInZone, clockHmInZone } from "../../../scripts/lib/timezone.mjs";
-import { computeStreakAndFreezes } from "../../../scripts/lib/streakMath.mjs";
+import { computeStreakAndFreezes, QUALIFYING_MINUTES } from "../../../scripts/lib/streakMath.mjs";
 
 const DAY_MS = 86_400_000;
 
@@ -209,49 +209,55 @@ export function deriveRealData(
   if (hasAnyData) {
     const longestSession = sessions.reduce((a, s) => (s.scoredMinutes > a.scoredMinutes ? s : a));
     const bestDay = daily.reduce((a, d) => (d.scoredMinutes > a.scoredMinutes ? d : a));
-    const busiestDay = daily.reduce((a, d) => (d.sessions > a.sessions ? d : a));
-    const mostEditsSession = sessions.reduce((a, s) => (s.eventCount > a.eventCount ? s : a));
     let bestWeek = { start: "", minutes: 0 };
-    for (let i = 0; i + 7 <= daily.length; i++) {
+    for (let i = 0; i < daily.length; i++) {
+      if (mondayIndexedDowFromDate(daily[i]!.date) !== 0) continue;
       const slice = daily.slice(i, i + 7);
       const minutes = slice.reduce((a, d) => a + d.scoredMinutes, 0);
-      if (minutes > bestWeek.minutes) bestWeek = { start: slice[0].date, minutes };
+      if (minutes > bestWeek.minutes) bestWeek = { start: slice[0]!.date, minutes };
+    }
+    const byMonth = new Map<string, number>();
+    for (const d of daily) {
+      if (d.sessions === 0) continue;
+      const month = d.date.slice(0, 7);
+      byMonth.set(month, (byMonth.get(month) ?? 0) + 1);
+    }
+    let bestMonth = { month: "", days: 0 };
+    for (const [month, days] of byMonth) {
+      if (days > bestMonth.days) bestMonth = { month, days };
     }
     records.push(
       { label: "Longest session", value: longestSession.scoredMinutes, unit: "min", when: longestSession.date },
-      { label: "Best day", value: bestDay.scoredMinutes, unit: "min", when: bestDay.date },
       { label: "Best week", value: Math.round((bestWeek.minutes / 60) * 10) / 10, unit: "hrs", when: bestWeek.start },
-      { label: "Most sessions in a day", value: busiestDay.sessions, unit: "", when: busiestDay.date },
-      { label: "Most edits in a session", value: mostEditsSession.eventCount, unit: "", when: mostEditsSession.date },
-      { label: "Longest streak", value: longestStreak, unit: "days", when: "" }
+      { label: "Most active days in a month", value: bestMonth.days, unit: "days", when: bestMonth.month ? `${bestMonth.month}-01` : "" },
+      { label: "Biggest day", value: bestDay.scoredMinutes, unit: "min", when: bestDay.date }
     );
   }
 
-  // --- badges ---------------------------------------------------------------
-  // b5 (geometry-verified count) and b9 (finish a week ranked first) can't be
-  // earned honestly in Phase 1 - no verification, and League is still
-  // fixtures - so both are hidden from the grid entirely rather than shown
-  // locked, which would invite "why can I never earn this." b11 ("20
-  // sessions before 8am") is still hidden: local-clock grouping exists now
-  // (Asia/Jerusalem) but the badge itself is not wired in this pass.
-  const maxScored = sessions.length ? Math.max(...sessions.map((s) => s.scoredMinutes)) : 0;
-  let mostDocsInAWeek = 0;
+  const afterMidnight = sessions.some((s) => {
+    const hour = Number(s.start.slice(0, 2));
+    return Number.isFinite(hour) && hour < 5;
+  });
+  let fullWeek = false;
   for (let i = 0; i + 7 <= daily.length; i++) {
-    const windowDates = new Set(daily.slice(i, i + 7).map((d) => d.date));
-    const docs = new Set<string>();
-    for (const s of sessions) if (windowDates.has(s.date)) for (const d of s.documents) docs.add(d.name);
-    mostDocsInAWeek = Math.max(mostDocsInAWeek, docs.size);
+    if (mondayIndexedDowFromDate(daily[i]!.date) !== 0) continue;
+    const slice = daily.slice(i, i + 7);
+    if (slice.every((d) => d.scoredMinutes >= QUALIFYING_MINUTES)) {
+      fullWeek = true;
+      break;
+    }
   }
+  const lifetimeHoursExact = lifetimeMinutes / 60;
   const BADGE_DEFS: { id: string; name: string; detail: string; glyph: string; earned: boolean }[] = [
-    { id: "b1", name: "First Extrude", detail: "Log your first session", glyph: "spark", earned: hasAnyData },
-    { id: "b2", name: "Week One", detail: "7-day streak", glyph: "flame", earned: longestStreak >= 7 },
-    { id: "b3", name: "Fortnight", detail: "14-day streak", glyph: "flame2", earned: longestStreak >= 14 },
-    { id: "b4", name: "Deep Work", detail: "One session over 20 minutes", glyph: "clock", earned: maxScored > 20 },
-    { id: "b6", name: "Fifty Hours", detail: "50 hours modeled", glyph: "hourglass", earned: lifetimeMinutes / 60 >= 50 },
-    { id: "b7", name: "Month Straight", detail: "30-day streak", glyph: "calendar", earned: longestStreak >= 30 },
-    { id: "b8", name: "Marathon", detail: "One session over 2 hours", glyph: "run", earned: maxScored > 120 },
-    { id: "b10", name: "Polymath", detail: "Touch 10 documents in a week", glyph: "layers", earned: mostDocsInAWeek >= 10 },
-    { id: "b12", name: "Century", detail: "100 hours modeled", glyph: "crown", earned: lifetimeMinutes / 60 >= 100 },
+    { id: "first", name: "First Extrude", detail: "Log your first session", glyph: "spark", earned: hasAnyData },
+    { id: "hours10", name: "Ten Hours", detail: "10 hours modeled", glyph: "hourglass", earned: lifetimeHoursExact >= 10 },
+    { id: "hours50", name: "Fifty Hours", detail: "50 hours modeled", glyph: "hourglass", earned: lifetimeHoursExact >= 50 },
+    { id: "hours100", name: "Century", detail: "100 hours modeled", glyph: "crown", earned: lifetimeHoursExact >= 100 },
+    { id: "streak7", name: "Week One", detail: "7-day streak", glyph: "flame", earned: longestStreak >= 7 },
+    { id: "streak30", name: "Month Straight", detail: "30-day streak", glyph: "calendar", earned: longestStreak >= 30 },
+    { id: "streak100", name: "Hundred Straight", detail: "100-day streak", glyph: "flame2", earned: longestStreak >= 100 },
+    { id: "midnight", name: "After Midnight", detail: "A session after midnight", glyph: "sunrise", earned: afterMidnight },
+    { id: "weekfull", name: "Full Week", detail: "Every day of one week", glyph: "check", earned: fullWeek },
   ];
   const badges: Badge[] = BADGE_DEFS.map((b) => ({ ...b, earnedOn: null }));
 

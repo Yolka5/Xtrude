@@ -100,35 +100,48 @@ check(
   JSON.stringify(result.records.find((r) => r.label === "Longest session"))
 );
 check(
-  "most sessions in a day = 3",
-  result.records.find((r) => r.label === "Most sessions in a day")?.value === 3,
-  JSON.stringify(result.records.find((r) => r.label === "Most sessions in a day"))
+  "biggest day record = 90 min",
+  result.records.find((r) => r.label === "Biggest day")?.value === 90,
+  JSON.stringify(result.records.find((r) => r.label === "Biggest day"))
 );
 check(
-  "most edits in a session = 40",
-  result.records.find((r) => r.label === "Most edits in a session")?.value === 40,
+  "badge first session earned",
+  result.badges.find((b) => b.id === "first")?.earned === true,
   ""
 );
 check(
-  "badge b2 (7-day streak) earned",
-  result.badges.find((b) => b.id === "b2")?.earned === true,
+  "badge 7-day streak earned",
+  result.badges.find((b) => b.id === "streak7")?.earned === true,
   ""
 );
 check(
-  "badge b3 (14-day streak) earned",
-  result.badges.find((b) => b.id === "b3")?.earned === true,
+  "badge 30-day streak NOT earned",
+  result.badges.find((b) => b.id === "streak30")?.earned === false,
   ""
 );
 check(
-  "badge b7 (30-day streak) NOT earned",
-  result.badges.find((b) => b.id === "b7")?.earned === false,
+  "badge 10h NOT earned at 5.5h lifetime",
+  result.badges.find((b) => b.id === "hours10")?.earned === false,
+  JSON.stringify(result.profile.lifetimeHours)
+);
+check(
+  "badge after-midnight NOT earned on afternoon sessions",
+  result.badges.find((b) => b.id === "midnight")?.earned === false,
   ""
 );
 check(
-  "no b5/b9/b11 in badge list (hidden, not locked)",
-  !result.badges.some((b) => ["b5", "b9", "b11"].includes(b.id)),
-  JSON.stringify(result.badges.map((b) => b.id))
+  "badge full week earned from the 18-day run",
+  result.badges.find((b) => b.id === "weekfull")?.earned === true,
+  ""
 );
+
+const empty = deriveRealData([], [], new Map(), TODAY_MS);
+check(
+  "no badge is earned without data",
+  empty.badges.length > 0 && empty.badges.every((b) => b.earned === false),
+  JSON.stringify(empty.badges.filter((b) => b.earned).map((b) => b.id))
+);
+check("no records without data", empty.records.length === 0, JSON.stringify(empty.records));
 check(
   "documents resolve to real names",
   result.sessions.every((s) => s.documents.every((d) => d.name !== "Unknown document")),
@@ -256,6 +269,11 @@ check("derive: 00:30 Israel clock is 12:30 AM", edge.sessions.find((s) => s.id =
 check("derive: 23:30 Israel session.date stays 2026-09-12", edge.sessions.find((s) => s.id === "late")?.date === "2026-09-12", JSON.stringify(edge.sessions.find((s) => s.id === "late")));
 check("derive: 23:30 Israel clock is 11:30 PM", edge.sessions.find((s) => s.id === "late")?.start === "23:30", "");
 check("derive: today in Jerusalem at 10:00 IDT is 2026-09-12", edge.today === "2026-09-12", `got ${edge.today}`);
+check(
+  "badge after-midnight earned from a 00:30 session",
+  edge.badges.find((b) => b.id === "midnight")?.earned === true,
+  JSON.stringify(edge.badges.find((b) => b.id === "midnight"))
+);
 
 const ranked = rankStandings(
   [
