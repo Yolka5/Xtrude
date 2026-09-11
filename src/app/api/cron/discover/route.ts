@@ -14,7 +14,8 @@ import {
   lastDiscoveredAtFromValue,
   stampUserDiscovered,
 } from "@/lib/discoverDocuments";
-import { getValidAccessToken } from "@/lib/auth/tokens";
+import { getValidAccessToken, userNeedsReauth } from "@/lib/auth/tokens";
+import { createCallBudget, isBudgetExceeded, maxCallsPerRun } from "../../../../../scripts/lib/callBudget.mjs";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -35,8 +36,6 @@ export const maxDuration = 60;
  * and who have credentials.
  */
 
-const MAX_ONSHAPE_CALLS = 10;
-
 type UserLog = {
   userId: string;
   due: boolean;
@@ -50,12 +49,12 @@ type UserLog = {
   callsUsed: number;
 };
 
-function makeOnshapeForUser(userId: string, maxCalls: number) {
+function makeOnshapeForUser(userId: string, budget: ReturnType<typeof createCallBudget>) {
   if (userId === APP_USER_ID && process.env.ONSHAPE_ACCESS_KEY && process.env.ONSHAPE_SECRET_KEY) {
     return makeClient({
       accessKey: process.env.ONSHAPE_ACCESS_KEY,
       secretKey: process.env.ONSHAPE_SECRET_KEY,
-      maxCalls,
+      budget,
     });
   }
   return null;
@@ -79,6 +78,7 @@ async function handle(req: NextRequest) {
     webhooksRegistered: 0,
     errors: [] as string[],
     callsUsed: 0,
+    budget: null as unknown,
     rollup: null as unknown,
     streak: null as unknown,
     users: [] as UserLog[],
@@ -89,7 +89,8 @@ async function handle(req: NextRequest) {
     summary.errors.push(`loading users: ${userErr.message}`);
   }
   const users = userRows ?? [];
-  let remainingBudget = MAX_ONSHAPE_CALLS;
+  const budget = createCallBudget(maxCallsPerRun());
+  summary.budget = budget.snapshot();
 
   for (const user of users) {
     const userId = user.id as string;
@@ -126,14 +127,21 @@ async function handle(req: NextRequest) {
       continue;
     }
 
-    if (remainingBudget < 1) {
+    if (budget.remaining() < 1) {
       log.skipped = true;
-      log.reason = "due but Onshape budget exhausted this run";
+      log.reason = `due but Onshape budget exhausted this run (${budget.callsUsed()}/${budget.maxCalls} at ${budget.stoppedAt() ?? "cap"})`;
       summary.users.push(log);
       continue;
     }
 
-    let onshape = makeOnshapeForUser(userId, remainingBudget);
+    if (await userNeedsReauth(userId)) {
+      log.skipped = true;
+      log.reason = "due but needs Onshape reauth";
+      summary.users.push(log);
+      continue;
+    }
+
+    let onshape = makeOnshapeForUser(userId, budget);
     if (!onshape) {
       const token = await getValidAccessToken(userId);
       if (!token) {
@@ -142,7 +150,7 @@ async function handle(req: NextRequest) {
         summary.users.push(log);
         continue;
       }
-      onshape = makeClient({ accessToken: token, maxCalls: remainingBudget });
+      onshape = makeClient({ accessToken: token, budget });
     }
 
     const startedCalls = onshape.callsUsed();
@@ -169,13 +177,15 @@ async function handle(req: NextRequest) {
       const message = err instanceof Error ? err.message : String(err);
       summary.errors.push(`${userId}: ${message}`);
       log.reason = `${decision.reason}; error: ${message}`;
+      if (isBudgetExceeded(err)) log.skipped = true;
     }
     const used = onshape.callsUsed() - startedCalls;
-    remainingBudget = Math.max(0, remainingBudget - used);
-    summary.callsUsed += used;
+    summary.callsUsed = budget.callsUsed();
     log.callsUsed = used;
     summary.users.push(log);
   }
+
+  summary.budget = budget.snapshot();
 
   try {
     const rollups = [];

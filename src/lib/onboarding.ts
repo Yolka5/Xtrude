@@ -5,6 +5,7 @@ import { getSupabase } from "@/lib/db/client";
 import { getValidAccessToken } from "@/lib/auth/tokens";
 import { requireEnv } from "@/lib/env";
 import { DISCOVERY_EVENTS, stampUserDiscovered } from "@/lib/discoverDocuments";
+import { maxCallsPerRun } from "../../scripts/lib/callBudget.mjs";
 
 const EVENTS = DISCOVERY_EVENTS;
 
@@ -51,7 +52,7 @@ export async function onboardUser(userId: string): Promise<OnboardSummary> {
 
   const webhookUrl = requireEnv("WEBHOOK_URL");
   const supabase = getSupabase();
-  const onshape = makeClient({ accessToken, maxCalls: ONBOARD_MAX_CALLS });
+  const onshape = makeClient({ accessToken, maxCalls: Math.min(ONBOARD_MAX_CALLS, maxCallsPerRun()) });
   const now = new Date();
 
   const { docs } = await onshape.listMyDocuments(ONBOARD_MAX_DOCS);

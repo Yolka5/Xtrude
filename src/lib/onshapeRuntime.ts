@@ -10,7 +10,8 @@ export function makeClient(opts: {
   accessKey?: string;
   secretKey?: string;
   accessToken?: string;
-  maxCalls: number;
+  maxCalls?: number;
+  budget?: { take: (method: string, path: string) => void; callsUsed: () => number };
 }) {
   return makeClientImpl(opts as never);
 }

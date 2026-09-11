@@ -22,6 +22,7 @@ import { loadEnv, requireEnv } from "./lib/env.mjs";
 import { makeClient } from "./lib/onshape.mjs";
 import { createClient } from "@supabase/supabase-js";
 import { APP_USER_ID } from "./lib/appUser.mjs";
+import { maxCallsPerRun } from "./lib/callBudget.mjs";
 
 loadEnv();
 
@@ -42,7 +43,7 @@ function section(title) {
 function makeOnshape() {
   const accessKey = requireEnv("ONSHAPE_ACCESS_KEY");
   const secretKey = requireEnv("ONSHAPE_SECRET_KEY");
-  return makeClient({ accessKey, secretKey, maxCalls: Number(process.env.WEBHOOK_MAX_CALLS ?? 30) });
+  return makeClient({ accessKey, secretKey, maxCalls: maxCallsPerRun() });
 }
 
 function makeSupabase() {

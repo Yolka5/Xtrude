@@ -7,7 +7,7 @@
  *   npm run backfill                # the real thing
  *
  * Quota discipline: free/EDU Onshape accounts get 2,500 API calls PER YEAR.
- * This script hard-stops at BACKFILL_MAX_CALLS (default 150) and prints a
+ * This script hard-stops at ONSHAPE_MAX_CALLS_PER_RUN (default 100) and prints a
  * running count as it goes. History older than 12 months is skipped per
  * document rather than pulled and discarded, to keep the call count down on
  * documents with a long life.
@@ -21,11 +21,12 @@ import { loadEnv, requireEnv } from "./lib/env.mjs";
 import { makeClient } from "./lib/onshape.mjs";
 import { createClient } from "@supabase/supabase-js";
 import { APP_USER_ID } from "./lib/appUser.mjs";
+import { isBudgetExceeded, maxCallsPerRun } from "./lib/callBudget.mjs";
 
 loadEnv();
 
 const DRY_RUN = process.argv.includes("--dry-run");
-const MAX_CALLS = Number(process.env.BACKFILL_MAX_CALLS ?? 150);
+const MAX_CALLS = maxCallsPerRun();
 const MAX_DOCS = Number(process.env.BACKFILL_MAX_DOCS ?? 20);
 const CUTOFF_MONTHS = 12;
 
@@ -104,6 +105,7 @@ async function main() {
     } catch (err) {
       console.log(`  FAILED to get workspace: ${err.message}`);
       summary.push({ name: doc.name, failed: true });
+      if (isBudgetExceeded(err)) break;
       continue;
     }
 

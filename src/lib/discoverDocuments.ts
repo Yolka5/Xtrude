@@ -1,6 +1,7 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { ingestDocumentHistory } from "../../scripts/lib/ingestDocument.mjs";
+import { isBudgetExceeded } from "../../scripts/lib/callBudget.mjs";
 
 export const DISCOVERY_EVENTS = [
   "onshape.model.lifecycle.changed",
@@ -101,6 +102,7 @@ export async function discoverForUser(
         summary.documentsAdded++;
         knownIds.add(doc.id);
       } catch (err) {
+        if (isBudgetExceeded(err)) throw err;
         const message = err instanceof Error ? err.message : String(err);
         summary.errors.push(`discover ${doc.name ?? doc.id}: ${message}`);
       }
@@ -119,6 +121,7 @@ export async function discoverForUser(
         summary.documentsBackfilled++;
         summary.backfillEventsWritten += ingested.eventsWritten;
       } catch (err) {
+        if (isBudgetExceeded(err)) throw err;
         const message = err instanceof Error ? err.message : String(err);
         summary.errors.push(`backfill ${doc.name}: ${message}`);
       }
@@ -163,11 +166,13 @@ export async function discoverForUser(
         }
         summary.webhooksRegistered++;
       } catch (err) {
+        if (isBudgetExceeded(err)) throw err;
         const message = err instanceof Error ? err.message : String(err);
         summary.errors.push(`register ${doc.name}: ${message}`);
       }
     }
   } catch (err) {
+    if (isBudgetExceeded(err)) throw err;
     const message = err instanceof Error ? err.message : String(err);
     summary.errors.push(message);
   }

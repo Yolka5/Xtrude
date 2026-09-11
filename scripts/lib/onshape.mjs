@@ -11,6 +11,8 @@
  * other way round.
  */
 
+import { createCallBudget } from "./callBudget.mjs";
+
 const BASE_URL = "https://cad.onshape.com/api";
 
 /**
@@ -18,9 +20,11 @@ const BASE_URL = "https://cad.onshape.com/api";
  * @param {string} [opts.accessKey]
  * @param {string} [opts.secretKey]
  * @param {string} [opts.accessToken]
- * @param {number} opts.maxCalls
+ * @param {number} [opts.maxCalls]
+ * @param {ReturnType<typeof createCallBudget>} [opts.budget]
  */
-export function makeClient({ accessKey, secretKey, accessToken, maxCalls }) {
+export function makeClient({ accessKey, secretKey, accessToken, maxCalls, budget }) {
+  const cap = budget ?? createCallBudget(maxCalls ?? 100);
   const headers = {
     Authorization: accessToken
       ? `Bearer ${accessToken}`
@@ -29,20 +33,12 @@ export function makeClient({ accessKey, secretKey, accessToken, maxCalls }) {
     "Content-Type": "application/json",
   };
 
-  let calls = 0;
-
   async function request(method, path, { params = {}, body } = {}) {
-    if (calls >= maxCalls) {
-      throw new Error(
-        `Hit the ${maxCalls}-call budget before finishing ${method} ${path}. ` +
-          `Stopping here rather than risking the annual quota.`
-      );
-    }
+    cap.take(method, path);
     const url = new URL(`${BASE_URL}${path}`);
     for (const [key, value] of Object.entries(params)) {
       url.searchParams.set(key, String(value));
     }
-    calls++;
     const res = await fetch(url, { method, headers, body: body ? JSON.stringify(body) : undefined });
     if (!res.ok) {
       const responseBody = await res.text().catch(() => "");
@@ -66,7 +62,8 @@ export function makeClient({ accessKey, secretKey, accessToken, maxCalls }) {
     get,
     post,
     del,
-    callsUsed: () => calls,
+    callsUsed: () => cap.callsUsed(),
+    budget: cap,
 
     async whoAmI() {
       return get("/v6/users/sessioninfo");
