@@ -9,7 +9,7 @@ import { Icon } from "@/components/Icon";
 import type { League } from "@/lib/fixtures";
 import { duration, durationSpoken, plural } from "@/lib/format";
 import { haptics } from "@/lib/haptics";
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 
 const ROW_H = 64; // .rowitem's min-height (62px) + its 2px border
 
@@ -28,7 +28,6 @@ export function LeagueContent({
   const leader = league.members[0];
   const gap = leader && me ? leader.scoredMinutes - me.scoredMinutes : 0;
   const others = league.members.filter((m) => !m.isMe);
-  const celebrated = useRef(false);
 
   const fillPct =
     !leader || leader.scoredMinutes <= 0
@@ -36,11 +35,13 @@ export function LeagueContent({
       : (me.scoredMinutes / leader.scoredMinutes) * 100;
 
   useEffect(() => {
-    if (celebrated.current) return;
-    if (!me || me.movement <= 0) return;
-    celebrated.current = true;
-    haptics.celebrate();
-  }, [me]);
+    if (!me) return;
+    const key = "xtrude.leagueRank";
+    const prev = Number(window.sessionStorage.getItem(key) ?? "NaN");
+    window.sessionStorage.setItem(key, String(me.rank));
+    if (reduced) return;
+    if (Number.isFinite(prev) && me.rank < prev) haptics.celebrate();
+  }, [me, reduced]);
 
   const heroStyle = {
     "--hero-1": "var(--gold-1)",

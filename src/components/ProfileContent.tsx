@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef } from "react";
+import { useEffect, useRef } from "react";
 import { motion } from "motion/react";
 import { StatCard } from "@/components/Stat";
 import { ActivityHeatmap } from "@/components/ActivityHeatmap";
@@ -103,6 +103,18 @@ export function ProfileContent({
   hasAnyData: boolean;
 }) {
   const earned = badges.filter((b) => b.earned).length;
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const signature = `${badges.filter((b) => b.earned).map((b) => b.id).sort().join(",")}|${records.map((r) => `${r.label}:${r.value}`).join(";")}`;
+    const key = "xtrude.profileUnlocks";
+    const prev = window.sessionStorage.getItem(key);
+    window.sessionStorage.setItem(key, signature);
+    if (prev && prev !== signature) {
+      haptics.celebrate();
+      celebrate(PRISM_CONFETTI);
+    }
+  }, [badges, records]);
 
   return (
     <main className="screen">
