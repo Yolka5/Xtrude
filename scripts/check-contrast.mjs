@@ -159,6 +159,17 @@ check("bar-bottom (prism-2) vs white card", PRISM[2], T.surface, GRAPHIC);
 check("white glyph on neutral badge disc", "#ffffff", T.discNeutral, GRAPHIC);
 check("white glyph on prism badge disc (light end)", "#ffffff", PRISM[1], GRAPHIC);
 
+console.log("\n=== local profile avatar discs: white initials ===");
+for (const [name, hex] of [
+  ["charcoal", T.discNeutral],
+  ["violet", PRISM[1]],
+  ["magenta", PRISM.edge],
+  ["orange", FIRE[2]],
+  ["red", FIRE.edge],
+]) {
+  check(`white initials on ${name} avatar`, "#ffffff", hex, GRAPHIC);
+}
+
 console.log("\n=== activity ramp: adjacent steps clearly distinguishable ===");
 check("heat-0 vs white card", HEAT[0], T.surface, 1.05);
 check("heat-1 vs heat-0", HEAT[1], HEAT[0], 1.15);

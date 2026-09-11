@@ -18,6 +18,7 @@
  */
 import { loadEnv, requireEnv } from "./lib/env.mjs";
 import { createClient } from "@supabase/supabase-js";
+import { APP_USER_ID } from "./lib/appUser.mjs";
 
 loadEnv();
 
@@ -31,13 +32,13 @@ function section(title) {
 }
 
 async function count(supabase, table) {
-  const { count, error } = await supabase.from(table).select("*", { count: "exact", head: true });
+  const { count, error } = await supabase.from(table).select("*", { count: "exact", head: true }).eq("user_id", APP_USER_ID);
   if (error) throw new Error(`counting ${table}: ${error.message}`);
   return count ?? 0;
 }
 
-async function wipe(supabase, table, column) {
-  const { error } = await supabase.from(table).delete().gte(column, "1900-01-01");
+async function wipe(supabase, table) {
+  const { error } = await supabase.from(table).delete().eq("user_id", APP_USER_ID);
   if (error) throw new Error(`deleting from ${table}: ${error.message}`);
 }
 
@@ -66,11 +67,11 @@ async function main() {
 
   section("2. WIPE");
   console.log("Deleting events...");
-  await wipe(supabase, "events", "occurred_at");
+  await wipe(supabase, "events");
   console.log("Deleting sessions...");
-  await wipe(supabase, "sessions", "started_at");
+  await wipe(supabase, "sessions");
   console.log("Deleting daily_stats...");
-  await wipe(supabase, "daily_stats", "date");
+  await wipe(supabase, "daily_stats");
 
   section("3. CONFIRM");
   const after = {

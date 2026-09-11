@@ -1,6 +1,7 @@
 import "server-only";
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabase } from "@/lib/db/client";
+import { APP_USER_ID } from "../../../../../scripts/lib/appUser.mjs";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -32,6 +33,7 @@ const RATE_LIMIT_WINDOW_SECONDS = 10;
 const RATE_LIMIT_MAX = 40;
 
 async function logDelivery(params: {
+  userId?: string | null;
   webhookId: string | null;
   event: string | null;
   documentId: string | null;
@@ -41,6 +43,7 @@ async function logDelivery(params: {
   ip: string | null;
 }) {
   const { error } = await getSupabase().from("webhook_deliveries").insert({
+    user_id: params.userId || APP_USER_ID,
     onshape_webhook_id: params.webhookId,
     event: params.event,
     document_id: params.documentId,
@@ -93,7 +96,7 @@ export async function POST(req: NextRequest) {
 
   const { data: registration, error: regErr } = await getSupabase()
     .from("webhook_registrations")
-    .select("id, document_id, events, active")
+    .select("id, document_id, events, active, user_id")
     .eq("onshape_webhook_id", webhookId)
     .eq("active", true)
     .maybeSingle();
@@ -117,6 +120,7 @@ export async function POST(req: NextRequest) {
     // the endpoint is reachable and the registration is alive, not a model
     // change. Accepted and logged, no further action.
     await logDelivery({
+      userId: registration.user_id,
       webhookId,
       event,
       documentId: registration.document_id,
@@ -132,6 +136,7 @@ export async function POST(req: NextRequest) {
     // Defense in depth: Onshape should only ever send us event types we
     // registered for on this webhookId, but don't trust that blindly either.
     await logDelivery({
+      userId: registration.user_id,
       webhookId,
       event,
       documentId: registration.document_id,
@@ -148,10 +153,12 @@ export async function POST(req: NextRequest) {
   const { error: touchErr } = await getSupabase()
     .from("tracked_documents")
     .update({ last_notified_at: new Date().toISOString() })
-    .eq("id", registration.document_id);
+    .eq("id", registration.document_id)
+    .eq("user_id", registration.user_id);
   if (touchErr) console.error("tracked_documents touch failed:", touchErr.message);
 
   await logDelivery({
+    userId: registration.user_id,
     webhookId,
     event,
     documentId: registration.document_id,

@@ -1,9 +1,19 @@
-/** Row shapes for supabase/schema.sql. Hand-written, not generated - the
- * schema is four small tables and isn't expected to drift without a human
- * updating both places together. */
+/** Row shapes for supabase/schema.sql. Hand-written, not generated. */
+
+export interface UserRow {
+  id: string;
+  onshape_user_id: string | null;
+  display_name: string;
+  initials: string;
+  avatar_color: string;
+  notify_streak?: boolean;
+  notify_league?: boolean;
+  created_at: string;
+}
 
 export interface TrackedDocumentRow {
   id: string;
+  user_id: string;
   onshape_document_id: string;
   onshape_workspace_id: string;
   name: string;
@@ -15,6 +25,7 @@ export interface TrackedDocumentRow {
 
 export interface EventRow {
   id: string;
+  user_id: string;
   document_id: string;
   element_id: string | null;
   microversion_id: string;
@@ -25,6 +36,7 @@ export interface EventRow {
 
 export interface SessionRow {
   id: string;
+  user_id: string;
   started_at: string;
   ended_at: string;
   duration_seconds: number;
@@ -36,7 +48,30 @@ export interface SessionRow {
 }
 
 export interface DailyStatRow {
+  user_id: string;
   date: string;
   total_scored_minutes: number;
   session_count: number;
+}
+
+export interface LeagueRow {
+  id: string;
+  name: string;
+  join_code: string;
+  created_by: string;
+  created_at: string;
+}
+
+export interface LeagueMemberRow {
+  league_id: string;
+  user_id: string;
+  joined_at: string;
+}
+
+export interface OAuthTokenRow {
+  user_id: string;
+  access_cipher: string;
+  refresh_cipher: string;
+  expires_at: string;
+  updated_at: string;
 }

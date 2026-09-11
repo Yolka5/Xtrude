@@ -13,10 +13,18 @@
 
 const BASE_URL = "https://cad.onshape.com/api";
 
-export function makeClient({ accessKey, secretKey, maxCalls }) {
-  const token = Buffer.from(`${accessKey}:${secretKey}`).toString("base64");
+/**
+ * @param {object} opts
+ * @param {string} [opts.accessKey]
+ * @param {string} [opts.secretKey]
+ * @param {string} [opts.accessToken]
+ * @param {number} opts.maxCalls
+ */
+export function makeClient({ accessKey, secretKey, accessToken, maxCalls }) {
   const headers = {
-    Authorization: `Basic ${token}`,
+    Authorization: accessToken
+      ? `Bearer ${accessToken}`
+      : `Basic ${Buffer.from(`${accessKey}:${secretKey}`).toString("base64")}`,
     Accept: "application/json",
     "Content-Type": "application/json",
   };

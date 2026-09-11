@@ -6,7 +6,8 @@ import { Icon } from "./Icon";
 import { CountUp } from "./CountUp";
 import { TiltHero } from "./TiltHero";
 import { haptics } from "@/lib/haptics";
-import { burstAt } from "@/lib/confetti";
+import { burstAt, celebrate } from "@/lib/confetti";
+import { shortDate } from "@/lib/format";
 
 /**
  * Today's hero: fire, at full strength - a streak is a flame, the colour IS
@@ -19,7 +20,17 @@ import { burstAt } from "@/lib/confetti";
  * Reduce Motion switches off; the tap still registers, it just doesn't do
  * the burst.
  */
-export function StreakHero({ current, longest }: { current: number; longest: number }) {
+export function StreakHero({
+  current,
+  longest,
+  freezeBank = 0,
+  lastFreezeUsed = null,
+}: {
+  current: number;
+  longest: number;
+  freezeBank?: number;
+  lastFreezeUsed?: string | null;
+}) {
   const reduced = useReducedMotion();
   // Fixtures never hit current >= longest (they were hand-tuned so there was
   // always a record left to chase); real data eventually will, the moment a
@@ -37,6 +48,10 @@ export function StreakHero({ current, longest }: { current: number; longest: num
   const emberRef = useRef<HTMLDivElement>(null);
   const controls = useAnimationControls();
   const [lit, setLit] = useState(false);
+  const [particles, setParticles] = useState(false);
+  const [countKey, setCountKey] = useState(0);
+
+  const FIRE = ["#ffce5c", "#ff9147", "#ff5e3d", "#ffe08a"];
 
   const idleFlicker = {
     scale: [1, 1.03, 0.985, 1.045, 0.99, 1.02, 1],
@@ -69,6 +84,30 @@ export function StreakHero({ current, longest }: { current: number; longest: num
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [controls, reduced]);
 
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const key = "xtrude.lastStreak";
+    const prev = Number(window.sessionStorage.getItem(key) ?? "NaN");
+    window.sessionStorage.setItem(key, String(current));
+    if (!Number.isFinite(prev) || current <= prev) return;
+    if (reduced) return;
+    setParticles(true);
+    setCountKey((k) => k + 1);
+    haptics.streak();
+    if (emberRef.current) {
+      const r = emberRef.current.getBoundingClientRect();
+      burstAt((r.left + r.width / 2) / window.innerWidth, (r.top + r.height / 2) / window.innerHeight, FIRE);
+    }
+    if (current >= longest && longest > 0) {
+      haptics.celebrate();
+      celebrate(FIRE);
+    }
+    const t = window.setTimeout(() => setParticles(false), 900);
+    return () => window.clearTimeout(t);
+    // FIRE is constant
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [current, longest, reduced]);
+
   const heroStyle = {
     "--hero-1": "var(--fire-1)",
     "--hero-2": "var(--fire-2)",
@@ -97,6 +136,32 @@ export function StreakHero({ current, longest }: { current: number; longest: num
     <TiltHero className="hero" style={heroStyle} edge="var(--fire-edge)">
       <div className="row" style={{ gap: 18 }} aria-labelledby="streak-h">
         <div ref={emberRef} style={{ position: "relative" }}>
+          {particles
+            ? Array.from({ length: 10 }, (_, i) => (
+                <motion.span
+                  key={i}
+                  aria-hidden="true"
+                  style={{
+                    position: "absolute",
+                    left: 22,
+                    top: 22,
+                    width: 7,
+                    height: 7,
+                    borderRadius: "50%",
+                    background: FIRE[i % FIRE.length],
+                    pointerEvents: "none",
+                  }}
+                  initial={{ opacity: 1, x: 0, y: 0, scale: 1 }}
+                  animate={{
+                    opacity: 0,
+                    x: Math.cos((i / 10) * Math.PI * 2) * 36,
+                    y: Math.sin((i / 10) * Math.PI * 2) * 36,
+                    scale: 0.2,
+                  }}
+                  transition={{ duration: 0.7, ease: "easeOut" }}
+                />
+              ))
+            : null}
           <motion.span
             className="ember-halo"
             aria-hidden="true"
@@ -129,9 +194,14 @@ export function StreakHero({ current, longest }: { current: number; longest: num
 
         <div className="stack" style={{ gap: 4 }}>
           <div style={{ display: "flex", alignItems: "baseline", gap: 7 }}>
-            <span className="hero-value" style={{ fontSize: 68 }}>
-              <CountUp value={current} />
-            </span>
+            <motion.span
+              className="hero-value"
+              style={{ fontSize: 68, display: "inline-block" }}
+              animate={particles && !reduced ? { scale: [1, 1.28, 0.92, 1] } : { scale: 1 }}
+              transition={reduced ? { duration: 0 } : { duration: 0.55, times: [0, 0.35, 0.7, 1] }}
+            >
+              <CountUp key={countKey} value={current} />
+            </motion.span>
             <span className="hero-unit" style={{ fontSize: 22 }}>
               {current === 1 ? "day" : "days"}
             </span>
@@ -153,6 +223,26 @@ export function StreakHero({ current, longest }: { current: number; longest: num
           {neverStarted ? "Start your streak" : atRecord ? "New record" : `${toBeat} to beat it`}
         </span>
       </div>
+
+      {lastFreezeUsed || freezeBank > 0 ? (
+        <>
+          <div className="hero-rule" />
+          <div className="spread">
+            <span className="t-footnote hero-sub">
+              {lastFreezeUsed ? (
+                <>Freeze used {shortDate(lastFreezeUsed)} — your streak would have broken</>
+              ) : (
+                <>{freezeBank === 1 ? "1 freeze banked" : `${freezeBank} freezes banked`}</>
+              )}
+            </span>
+            {lastFreezeUsed ? (
+              <span className="hero-chip">
+                {freezeBank === 0 ? "No freezes left" : freezeBank === 1 ? "1 left" : `${freezeBank} left`}
+              </span>
+            ) : null}
+          </div>
+        </>
+      ) : null}
     </TiltHero>
   );
 }

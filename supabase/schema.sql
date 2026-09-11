@@ -1,62 +1,67 @@
--- Xtrude Phase 1 schema. Single user, no auth - every table is written and
--- read exclusively with the service-role key from server code, never from
--- the browser, so Row Level Security below is a deliberate lockout (no
--- policies) rather than something client code is expected to satisfy.
+-- Xtrude schema. One users row today (Yoni); no OAuth. Server code writes
+-- and reads with the service-role key, which bypasses RLS. authenticated
+-- policies below are the shape a future login will use: a user only sees
+-- their own rows. anon has no policies, so a leaked client key still
+-- reads nothing.
 --
--- Run this once in the Supabase SQL editor (Project -> SQL Editor -> New
--- query) against a fresh project. Safe to re-run: every statement is
--- idempotent (CREATE ... IF NOT EXISTS / OR REPLACE).
+-- Fresh project: paste this whole file into the SQL editor and run it.
+-- Existing Phase-1 project: run supabase/migrate-users.sql instead, do not
+-- re-run this file (CREATE TABLE IF NOT EXISTS will not add user_id).
 
 create extension if not exists pgcrypto;
 
--- One row per Onshape document this account tracks. The backfill script
--- upserts into this table as it discovers documents, and stamps
--- last_backfilled_at so a future incremental backfill (Phase 1b) knows
--- where it left off.
+create table if not exists users (
+  id               uuid primary key default gen_random_uuid(),
+  onshape_user_id  text unique,
+  display_name     text not null,
+  initials         text not null,
+  avatar_color     text not null,
+  notify_streak    boolean not null default true,
+  notify_league    boolean not null default true,
+  created_at       timestamptz not null default now()
+);
+
+-- Stable id, shared with scripts/lib/appUser.mjs (APP_USER_ID).
+insert into users (id, display_name, initials, avatar_color)
+values (
+  'e7b3c91a-4d2f-4a8e-9c15-6f8a2d4b1e70',
+  'Yoni',
+  'YS',
+  '#2b2b30'
+)
+on conflict (id) do nothing;
+
 create table if not exists tracked_documents (
   id                    uuid primary key default gen_random_uuid(),
-  onshape_document_id   text not null unique,
+  user_id               uuid not null default 'e7b3c91a-4d2f-4a8e-9c15-6f8a2d4b1e70' references users(id) on delete cascade,
+  onshape_document_id   text not null,
   onshape_workspace_id  text not null,
   name                  text not null,
   last_backfilled_at    timestamptz,
   created_at            timestamptz not null default now(),
-  -- Phase 1b, live capture: last_notified_at is stamped by the webhook
-  -- endpoint the moment a real model-change delivery arrives for this
-  -- document - a cheap marker, not the microversion data itself (Onshape's
-  -- notification payload doesn't carry one, see webhookIngest.mjs). The
-  -- page-load / GitHub Actions sync treats "notified more recently than synced" as its
-  -- worklist, so a document with no new activity costs it nothing.
   last_notified_at      timestamptz,
-  last_synced_at        timestamptz
+  last_synced_at        timestamptz,
+  unique (user_id, onshape_document_id)
 );
 
--- Append-only. One row per microversion pulled from Onshape's
--- documenthistory. Nothing ever updates or deletes a row here except a
--- deliberate re-backfill - sessions and daily_stats are entirely derived
--- from this table, so the scoring algorithm can change later and history
--- gets recomputed, not lost.
 create table if not exists events (
   id               uuid primary key default gen_random_uuid(),
+  user_id          uuid not null default 'e7b3c91a-4d2f-4a8e-9c15-6f8a2d4b1e70' references users(id) on delete cascade,
   document_id      uuid not null references tracked_documents(id) on delete cascade,
   element_id       text,
   microversion_id  text not null,
   occurred_at      timestamptz not null,
   raw              jsonb not null,
   created_at       timestamptz not null default now(),
-  -- Lets the backfill script use ON CONFLICT DO NOTHING and be safely
-  -- rerunnable without scanning first or producing duplicate events.
   unique (document_id, microversion_id)
 );
 
 create index if not exists events_occurred_at_idx on events (occurred_at);
+create index if not exists events_user_id_idx on events (user_id);
 
--- Fully derived from events by scripts/recompute-sessions.mjs, which wipes
--- and rebuilds both this table and daily_stats on every run rather than
--- trying to diff old sessions against new ones. At single-user, few-hundred-
--- row volume a full rebuild is simpler than incremental merge logic and
--- trivially idempotent: same events in, same rows out, every time.
 create table if not exists sessions (
   id               uuid primary key default gen_random_uuid(),
+  user_id          uuid not null default 'e7b3c91a-4d2f-4a8e-9c15-6f8a2d4b1e70' references users(id) on delete cascade,
   started_at       timestamptz not null,
   ended_at         timestamptz not null,
   duration_seconds integer not null,
@@ -68,39 +73,31 @@ create table if not exists sessions (
 );
 
 create index if not exists sessions_started_at_idx on sessions (started_at);
+create index if not exists sessions_user_id_idx on sessions (user_id);
 
--- Also fully derived, one row per calendar day that had at least one
--- session. Rebuilt alongside sessions.
 create table if not exists daily_stats (
-  date                 date primary key,
+  user_id              uuid not null default 'e7b3c91a-4d2f-4a8e-9c15-6f8a2d4b1e70' references users(id) on delete cascade,
+  date                 date not null,
   total_scored_minutes numeric not null,
-  session_count        integer not null
+  session_count        integer not null,
+  primary key (user_id, date)
 );
 
--- Phase 1b: one row per Onshape webhook this app has registered. The
--- source of truth the public webhook endpoint checks every delivery
--- against - Onshape doesn't deduplicate registration calls, so this also
--- lets the registration script tell "already registered" from "needs one"
--- before ever calling createWebhook again.
 create table if not exists webhook_registrations (
   id                  uuid primary key default gen_random_uuid(),
+  user_id             uuid not null default 'e7b3c91a-4d2f-4a8e-9c15-6f8a2d4b1e70' references users(id) on delete cascade,
   onshape_webhook_id  text not null unique,
   document_id         uuid not null references tracked_documents(id) on delete cascade,
   events              text[] not null,
   active              boolean not null default true,
   created_at          timestamptz not null default now(),
   unregistered_at     timestamptz,
-  -- One active registration per document: all watched event types ride on
-  -- a single webhook (Onshape's `events` field on createWebhook takes an
-  -- array), so there's never a reason for two.
   unique (document_id)
 );
 
--- Every inbound POST to /api/webhooks/onshape, accepted or rejected. This
--- is the entire answer to "did webhooks break, or did I just not model
--- anything this week" - both look identical from Today/Sessions without it.
 create table if not exists webhook_deliveries (
   id                  uuid primary key default gen_random_uuid(),
+  user_id             uuid not null default 'e7b3c91a-4d2f-4a8e-9c15-6f8a2d4b1e70' references users(id) on delete cascade,
   received_at         timestamptz not null default now(),
   onshape_webhook_id  text,
   event               text,
@@ -112,16 +109,15 @@ create table if not exists webhook_deliveries (
 );
 
 create index if not exists webhook_deliveries_received_at_idx on webhook_deliveries (received_at desc);
+create index if not exists webhook_deliveries_user_id_idx on webhook_deliveries (user_id);
 
--- Small key/value table for cross-invocation bookkeeping that doesn't
--- warrant its own table - currently the two cron jobs' last-run summaries,
--- read by /admin so "is this still alive" doesn't require reading logs.
 create table if not exists app_state (
   key         text primary key,
   value       jsonb not null,
   updated_at  timestamptz not null default now()
 );
 
+alter table users enable row level security;
 alter table tracked_documents enable row level security;
 alter table events enable row level security;
 alter table sessions enable row level security;
@@ -129,13 +125,145 @@ alter table daily_stats enable row level security;
 alter table webhook_registrations enable row level security;
 alter table webhook_deliveries enable row level security;
 alter table app_state enable row level security;
--- No policies are created on purpose: with RLS on and zero policies, only
--- the service-role key (which bypasses RLS entirely) can read or write.
--- The anon/authenticated roles - the only ones a leaked client-side key
--- could use - get nothing.
 
--- Re-running this file against a project created before Phase 1b: the
--- table already exists from CREATE TABLE IF NOT EXISTS above, so the new
--- tracked_documents columns need their own idempotent add.
-alter table tracked_documents add column if not exists last_notified_at timestamptz;
-alter table tracked_documents add column if not exists last_synced_at timestamptz;
+drop policy if exists users_select_own on users;
+create policy users_select_own on users
+  for select to authenticated
+  using (id = auth.uid());
+
+drop policy if exists users_update_own on users;
+create policy users_update_own on users
+  for update to authenticated
+  using (id = auth.uid())
+  with check (id = auth.uid());
+
+drop policy if exists tracked_documents_own on tracked_documents;
+create policy tracked_documents_own on tracked_documents
+  for all to authenticated
+  using (user_id = auth.uid())
+  with check (user_id = auth.uid());
+
+drop policy if exists events_own on events;
+create policy events_own on events
+  for all to authenticated
+  using (user_id = auth.uid())
+  with check (user_id = auth.uid());
+
+drop policy if exists sessions_own on sessions;
+create policy sessions_own on sessions
+  for all to authenticated
+  using (user_id = auth.uid())
+  with check (user_id = auth.uid());
+
+drop policy if exists daily_stats_own on daily_stats;
+create policy daily_stats_own on daily_stats
+  for all to authenticated
+  using (user_id = auth.uid())
+  with check (user_id = auth.uid());
+
+drop policy if exists webhook_registrations_own on webhook_registrations;
+create policy webhook_registrations_own on webhook_registrations
+  for all to authenticated
+  using (user_id = auth.uid())
+  with check (user_id = auth.uid());
+
+drop policy if exists webhook_deliveries_own on webhook_deliveries;
+create policy webhook_deliveries_own on webhook_deliveries
+  for all to authenticated
+  using (user_id = auth.uid())
+  with check (user_id = auth.uid());
+
+create table if not exists leagues (
+  id          uuid primary key default gen_random_uuid(),
+  name        text not null,
+  join_code   text not null unique,
+  created_by  uuid not null references users(id) on delete cascade,
+  created_at  timestamptz not null default now()
+);
+
+create table if not exists league_members (
+  league_id  uuid not null references leagues(id) on delete cascade,
+  user_id    uuid not null references users(id) on delete cascade,
+  joined_at  timestamptz not null default now(),
+  primary key (league_id, user_id)
+);
+
+create index if not exists league_members_user_id_idx on league_members (user_id);
+
+insert into leagues (id, name, join_code, created_by)
+values (
+  'a1c4e8b2-7d3f-4a91-9e05-2c6b8f0d4a17',
+  'Xtrude',
+  'XTRUDE',
+  'e7b3c91a-4d2f-4a8e-9c15-6f8a2d4b1e70'
+)
+on conflict (id) do nothing;
+
+insert into league_members (league_id, user_id)
+values (
+  'a1c4e8b2-7d3f-4a91-9e05-2c6b8f0d4a17',
+  'e7b3c91a-4d2f-4a8e-9c15-6f8a2d4b1e70'
+)
+on conflict (league_id, user_id) do nothing;
+
+alter table leagues enable row level security;
+alter table league_members enable row level security;
+
+drop policy if exists leagues_select_member on leagues;
+create policy leagues_select_member on leagues
+  for select to authenticated
+  using (
+    exists (
+      select 1 from league_members m
+      where m.league_id = leagues.id and m.user_id = auth.uid()
+    )
+  );
+
+drop policy if exists leagues_insert_own on leagues;
+create policy leagues_insert_own on leagues
+  for insert to authenticated
+  with check (created_by = auth.uid());
+
+drop policy if exists league_members_select_same_league on league_members;
+create policy league_members_select_same_league on league_members
+  for select to authenticated
+  using (
+    exists (
+      select 1 from league_members me
+      where me.league_id = league_members.league_id
+        and me.user_id = auth.uid()
+    )
+  );
+
+drop policy if exists league_members_insert_self on league_members;
+create policy league_members_insert_self on league_members
+  for insert to authenticated
+  with check (user_id = auth.uid());
+
+drop policy if exists league_members_delete_self on league_members;
+create policy league_members_delete_self on league_members
+  for delete to authenticated
+  using (user_id = auth.uid());
+
+create table if not exists oauth_tokens (
+  user_id          uuid primary key references users(id) on delete cascade,
+  access_cipher    text not null,
+  refresh_cipher   text not null,
+  expires_at       timestamptz not null,
+  updated_at       timestamptz not null default now()
+);
+
+alter table oauth_tokens enable row level security;
+
+create table if not exists push_subscriptions (
+  id          uuid primary key default gen_random_uuid(),
+  user_id     uuid not null references users(id) on delete cascade,
+  endpoint    text not null unique,
+  p256dh      text not null,
+  auth        text not null,
+  created_at  timestamptz not null default now()
+);
+
+create index if not exists push_subscriptions_user_id_idx on push_subscriptions (user_id);
+
+alter table push_subscriptions enable row level security;

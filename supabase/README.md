@@ -8,11 +8,16 @@ One-time setup, about five minutes.
    (we use the API, not a direct Postgres connection), but save it somewhere
    anyway.
 2. Wait for the project to finish provisioning (a minute or two).
-3. Open **SQL Editor** in the left sidebar -> **New query**, paste in the
-   entire contents of `supabase/schema.sql` from this repo, and run it. It
-   creates four tables (`tracked_documents`, `events`, `sessions`,
-   `daily_stats`) with RLS locked down so only a service-role key can touch
-   them. You should see "Success. No rows returned."
+3. Open **SQL Editor** in the left sidebar -> **New query**:
+   - **Fresh project:** paste `supabase/schema.sql` and run it.
+   - **This live project (already has Phase 1 tables):** paste
+     `supabase/migrate-users.sql` and run it **before** deploying the
+     matching code. That file's header explains what breaks if you
+     reverse the order.
+   It creates `users` plus `user_id` on the data tables, backfills every
+   existing row to Yoni, and adds RLS policies so an authenticated user
+   (none today — no OAuth) can only see their own rows. The service-role
+   key still bypasses RLS. You should see "Success. No rows returned."
 4. Open **Project Settings** (gear icon) -> **API**. Copy two values:
    - **Project URL** -> this is `SUPABASE_URL`
    - **service_role** key under "Project API keys" (not the `anon` one) ->

@@ -1,20 +1,16 @@
 /**
- * Phase 0.5 anchored all date maths to a frozen TODAY fixture constant,
- * because the shell was statically exported and a clock-dependent render
- * would drift out of sync with the prerendered HTML the moment the day
- * rolled over. Phase 1 has a real server rendering these on every request
- * (see the `force-dynamic` pages), so "today" is the real clock now - the
- * original problem this was working around no longer exists. `todayMs()`
- * reads the clock fresh on every call rather than once at module load,
- * since a long-running server process could otherwise freeze "today" at
- * whatever moment it happened to first import this module.
+ * Date labels and "days ago" are Asia/Jerusalem civil dates. Session rows
+ * store UTC; derive.ts converts to local YYYY-MM-DD / HH:MM before these
+ * helpers see them. `todayDate()` is read fresh on every call so a
+ * long-running server cannot freeze "today" at first import.
  */
+
+import { calendarDateInZone } from "../../scripts/lib/timezone.mjs";
 
 const DAY_MS = 86400000;
 const ms = (isoDate: string) => Date.parse(`${isoDate}T00:00:00Z`);
-function todayMs(): number {
-  const now = new Date();
-  return Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+function todayDate(): string {
+  return calendarDateInZone(Date.now());
 }
 
 const WEEKDAY = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -22,7 +18,7 @@ const MONTH = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
                "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 export function daysAgo(isoDate: string): number {
-  return Math.round((todayMs() - ms(isoDate)) / DAY_MS);
+  return Math.round((ms(todayDate()) - ms(isoDate)) / DAY_MS);
 }
 
 /** "Today" / "Yesterday" / "Mon 7 Sep" */

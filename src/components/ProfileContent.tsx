@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef } from "react";
+import { useEffect, useRef } from "react";
 import { motion } from "motion/react";
 import { StatCard } from "@/components/Stat";
 import { ActivityHeatmap } from "@/components/ActivityHeatmap";
@@ -12,6 +12,8 @@ import type { Badge, DayTotal, PersonalRecord, ProfileStats } from "@/lib/fixtur
 import { duration, plural, shortDate } from "@/lib/format";
 import { haptics } from "@/lib/haptics";
 import { burstAt, celebrate } from "@/lib/confetti";
+import { ProfileIdentity } from "@/components/ProfileIdentity";
+import { NotificationSettings } from "@/components/NotificationSettings";
 
 const PRISM_CONFETTI = ["#9e74e7", "#f04cf0", "#ff52a8"];
 
@@ -103,28 +105,24 @@ export function ProfileContent({
 }) {
   const earned = badges.filter((b) => b.earned).length;
 
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const signature = `${badges.filter((b) => b.earned).map((b) => b.id).sort().join(",")}|${records.map((r) => `${r.label}:${r.value}`).join(";")}`;
+    const key = "xtrude.profileUnlocks";
+    const prev = window.sessionStorage.getItem(key);
+    window.sessionStorage.setItem(key, signature);
+    if (prev && prev !== signature) {
+      haptics.celebrate();
+      celebrate(PRISM_CONFETTI);
+    }
+  }, [badges, records]);
+
   return (
     <main className="screen">
       {/* Identity - intentionally minimal so it doesn't compete with the hero */}
       <FlyItem>
         <h1 className="screen__title">Profile</h1>
-        <div className="row" style={{ gap: 14, margin: "8px 4px 20px" }}>
-          <span
-            className="avatar"
-            style={{
-              width: 54, height: 54, fontSize: 19,
-              background: "var(--disc-neutral)",
-              color: "#fff", boxShadow: "0 6px 0 0 var(--chunk-edge-neutral-strong)",
-            }}
-            aria-hidden="true"
-          >
-            {profile.initials}
-          </span>
-          <div className="stack" style={{ gap: 2 }}>
-            <span className="t-title3">{profile.name}</span>
-            <span className="t-footnote dim">{profile.handle} &middot; since {profile.memberSince}</span>
-          </div>
-        </div>
+        <ProfileIdentity handle={profile.handle} memberSince={profile.memberSince} />
       </FlyItem>
 
       {/* Hero: the all-time heatmap. Profile has no colour of its own, so
@@ -209,6 +207,10 @@ export function ProfileContent({
             ? `${daysTracked} days tracked · ${duration(profile.lifetimeMinutes)} scored`
             : "Day one · nothing modeled yet"}
         </p>
+        <p className="t-caption dimmer" style={{ margin: "12px 4px 0", textAlign: "center" }}>
+          <a href="/api/auth/logout" className="t-caption" style={{ color: "inherit" }}>Sign out</a>
+        </p>
+        <NotificationSettings />
       </FlyItem>
     </main>
   );

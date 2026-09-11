@@ -10,9 +10,8 @@
  * Run: npm run recompute-sessions
  *
  * Calendar days for daily_stats are bucketed by each session's start time
- * in UTC. Onshape returns UTC and this script has no notion of "your local
- * day" - if that ever matters for display (e.g. a session that starts just
- * before local midnight), it's a UI-layer concern, not this script's.
+ * in Asia/Jerusalem. Timestamps stay UTC in the database; only the grouping
+ * date is converted.
  */
 import { loadEnv, requireEnv } from "./lib/env.mjs";
 import { createClient } from "@supabase/supabase-js";

@@ -35,6 +35,7 @@ const SHELL = [
   "/icons/icon-192.png",
   "/icons/icon-512.png",
   "/icons/apple-touch-icon.png",
+  "/icons/shortcut-96.png",
 ];
 
 self.addEventListener("install", (event) => {
@@ -118,6 +119,28 @@ self.addEventListener("fetch", (event) => {
     return;
   }
   event.respondWith(staleWhileRevalidate(request));
+});
+
+self.addEventListener("push", (event) => {
+  let data = { title: "Xtrude", body: "", url: "/" };
+  try {
+    if (event.data) data = { ...data, ...event.data.json() };
+  } catch {
+    /* ignore malformed payloads */
+  }
+  event.waitUntil(
+    self.registration.showNotification(data.title, {
+      body: data.body,
+      data: { url: data.url },
+      icon: "/icons/icon-192.png",
+    })
+  );
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const url = event.notification.data?.url || "/";
+  event.waitUntil(self.clients.openWindow(url));
 });
 `;
 

@@ -1,4 +1,5 @@
 import { getSupabase } from "@/lib/db/client";
+import { getCurrentUserId } from "@/lib/auth/currentUser";
 
 export const dynamic = "force-dynamic";
 
@@ -34,10 +35,12 @@ function timeAgo(iso: string): string {
 
 export default async function AdminPage() {
   const supabase = getSupabase();
+  const userId = await getCurrentUserId();
 
   const { data: deliveries, error: deliveriesErr } = await supabase
     .from("webhook_deliveries")
     .select("id, received_at, onshape_webhook_id, event, accepted, reason, ip, tracked_documents(name)")
+    .eq("user_id", userId)
     .order("received_at", { ascending: false })
     .limit(50);
 
@@ -87,7 +90,7 @@ export default async function AdminPage() {
         <StatusCard
           label="Last daily discovery"
           value={lastDiscovery ? timeAgo(lastDiscovery.updated_at) : "never ran"}
-          detail={lastDiscovery ? summarizeDiscovery(lastDiscovery.value) : "Vercel Cron at 21:00 UTC (midnight Asia/Jerusalem)"}
+          detail={lastDiscovery ? summarizeDiscovery(lastDiscovery.value) : "Vercel Cron at 22:00 UTC (midnight IST / 01:00 IDT)"}
         />
         <StatusCard
           label="Last daily rollup"
@@ -106,6 +109,32 @@ export default async function AdminPage() {
           }
         />
       </section>
+
+      {Array.isArray((lastDiscovery?.value as { users?: unknown[] } | undefined)?.users) ? (
+        <section style={{ marginBottom: 24 }}>
+          <h2 style={{ fontSize: 15, marginBottom: 8 }}>Last discovery, per user</h2>
+          <table style={{ borderCollapse: "collapse", width: "100%", fontSize: 12 }}>
+            <thead>
+              <tr style={{ textAlign: "left", borderBottom: "1px solid #ccc" }}>
+                <Th>User</Th>
+                <Th>Cadence</Th>
+                <Th>Result</Th>
+                <Th>Why</Th>
+              </tr>
+            </thead>
+            <tbody>
+              {((lastDiscovery?.value as { users: Array<{ userId: string; cadence: string; due: boolean; skipped: boolean; reason: string }> }).users).map((u) => (
+                <tr key={u.userId} style={{ borderBottom: "1px solid #eee" }}>
+                  <Td>{u.userId}</Td>
+                  <Td>{u.cadence}</Td>
+                  <Td>{u.due && !u.skipped ? "due" : "skipped"}</Td>
+                  <Td>{u.reason}</Td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </section>
+      ) : null}
 
       <h2 style={{ fontSize: 15, marginBottom: 8 }}>Last {rows.length} deliveries</h2>
       {deliveriesErr ? (
@@ -175,13 +204,26 @@ function summarizeSync(v: any): string {
 
 function summarizeDiscovery(v: any): string {
   if (!v) return "";
-  const parts = [
-    `${v.documentsSeen ?? 0} seen`,
-    `${v.documentsAdded ?? 0} added`,
-    `${v.documentsBackfilled ?? 0} first-backfilled`,
-    `${v.webhooksRegistered ?? 0} registered`,
-    `${v.callsUsed ?? 0} calls`,
-  ];
+  const users = Array.isArray(v.users) ? v.users : [];
+  const parts: string[] = [];
+  if (users.length) {
+    const ran = users.filter((u: { due?: boolean; skipped?: boolean }) => u.due && !u.skipped).length;
+    const skipped = users.filter((u: { skipped?: boolean }) => u.skipped).length;
+    parts.push(`${ran} discovered`, `${skipped} skipped`);
+    for (const u of users) {
+      const id = String(u.userId ?? "").slice(0, 8);
+      const verb = u.due && !u.skipped ? "due" : "skipped";
+      parts.push(`${id}: ${verb} — ${u.reason}`);
+    }
+  } else {
+    parts.push(
+      `${v.documentsSeen ?? 0} seen`,
+      `${v.documentsAdded ?? 0} added`,
+      `${v.documentsBackfilled ?? 0} first-backfilled`,
+      `${v.webhooksRegistered ?? 0} registered`
+    );
+  }
+  parts.push(`${v.callsUsed ?? 0} calls`);
   if (v.errors?.length) parts.push(`${v.errors.length} error(s)`);
   return parts.join(" · ");
 }
