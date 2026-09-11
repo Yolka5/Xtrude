@@ -218,10 +218,11 @@ export function ProfileContent({
             ? `${daysTracked} days tracked · ${duration(profile.lifetimeMinutes)} scored`
             : "Day one · nothing modeled yet"}
         </p>
+        <NotificationSettings />
         <form
           action="/api/auth/logout"
           method="POST"
-          style={{ margin: "16px 0 0", textAlign: "center" }}
+          style={{ margin: "20px 0 0", textAlign: "center" }}
           onSubmit={() => {
             try {
               navigator.serviceWorker?.controller?.postMessage({ type: "signout" });
@@ -230,11 +231,10 @@ export function ProfileContent({
             }
           }}
         >
-          <button type="submit" className="text-btn text-btn--strong">
+          <button type="submit" className="text-btn">
             Sign out
           </button>
         </form>
-        <NotificationSettings />
       </FlyItem>
     </main>
   );

@@ -4,6 +4,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import type { LeagueSummary } from "@/lib/db/leagues";
 import { invitePath } from "@/lib/invite";
+import { Icon } from "./Icon";
 
 export function LeagueManage({
   leagueId,
@@ -101,17 +102,12 @@ export function LeagueManage({
 
       {joinCode ? (
         <section className="chunk chunk-sm">
-          <p className="t-footnote dim" style={{ margin: 0 }}>
-            Join code <strong className="num" style={{ color: "var(--label)" }}>{joinCode}</strong>
-            {" · "}share the code, or this link:
-          </p>
-          <div className="row" style={{ gap: 8, marginTop: 10, flexWrap: "wrap", alignItems: "center" }}>
-            <code className="t-footnote" style={{ margin: 0, wordBreak: "break-all", color: "var(--label)" }}>
-              {shareUrl}
-            </code>
+          <p className="t-footnote dim" style={{ margin: "0 0 10px" }}>Join code · share it or the link below</p>
+          <div className="row" style={{ gap: 10, flexWrap: "wrap" }}>
+            <span className="code-chip">{joinCode}</span>
             <button
               type="button"
-              className="text-btn text-btn--strong"
+              className="btn btn-secondary btn-sm"
               disabled={busy}
               onClick={() => {
                 const url = `${window.location.origin}${invitePath(joinCode)}`;
@@ -122,11 +118,14 @@ export function LeagueManage({
                   /* clipboard permission denied — the path is still visible */
                 });
               }}
-              style={{ paddingLeft: 0 }}
             >
-              {copied ? "Copied" : "Copy invite link"}
+              <Icon name={copied ? "check" : "copy"} size={15} />
+              {copied ? "Copied" : "Copy link"}
             </button>
           </div>
+          <p className="t-caption dimmer" style={{ margin: "10px 0 0", wordBreak: "break-all" }}>
+            {shareUrl}
+          </p>
           {isOwner && leagueId ? (
             <div className="stack" style={{ gap: 10, marginTop: 10 }}>
               <form
@@ -147,32 +146,33 @@ export function LeagueManage({
                     disabled={busy}
                   />
                 </label>
-                <button
-                  type="submit"
-                  className="text-btn text-btn--strong"
-                  disabled={busy || rename.trim().length < 2 || rename.trim() === leagueName}
-                >
-                  Rename
-                </button>
+                <div className="row" style={{ gap: 8, flexWrap: "wrap" }}>
+                  <button
+                    type="submit"
+                    className="btn btn-primary btn-sm"
+                    disabled={busy || rename.trim().length < 2 || rename.trim() === leagueName}
+                  >
+                    Rename
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-sm"
+                    disabled={busy}
+                    onClick={() => void post("/api/leagues/regenerate-code", { leagueId })}
+                  >
+                    New join code
+                  </button>
+                </div>
               </form>
-              <button
-                type="button"
-                className="text-btn"
-                disabled={busy}
-                onClick={() => void post("/api/leagues/regenerate-code", { leagueId })}
-                style={{ paddingLeft: 0 }}
-              >
-                New join code
-              </button>
             </div>
           ) : null}
           {leagueId ? (
             <button
               type="button"
-              className="text-btn"
+              className="btn-ghost-danger"
               disabled={busy}
               onClick={() => void post("/api/leagues/leave", { leagueId })}
-              style={{ paddingLeft: 0 }}
+              style={{ marginTop: 14 }}
             >
               Leave this league
             </button>
@@ -192,7 +192,7 @@ export function LeagueManage({
             disabled={busy}
           />
         </label>
-        <button type="submit" className="text-btn text-btn--strong" disabled={busy || name.trim().length < 2}>
+        <button type="submit" className="btn btn-primary btn-block" disabled={busy || name.trim().length < 2}>
           Create
         </button>
       </form>
@@ -210,7 +210,7 @@ export function LeagueManage({
             disabled={busy}
           />
         </label>
-        <button type="submit" className="text-btn text-btn--strong" disabled={busy || code.trim().length < 4}>
+        <button type="submit" className="btn btn-primary btn-block" disabled={busy || code.trim().length < 4}>
           Join
         </button>
       </form>

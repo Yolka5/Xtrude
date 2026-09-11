@@ -283,6 +283,36 @@ button { font: inherit; color: inherit; border: 0; background: none; cursor: poi
 }
 .hero > * { position: relative; }
 
+/* Scroll-driven sheen - light raking across the gold as the card scrolls out
+   of view, which is the one thing a podium-gold surface should do that a flat
+   colour can't. Driven by a view timeline rather than JS: it runs off the main
+   thread, so it keeps its frames while the page is still fetching and
+   hydrating, which is exactly when a League screen is being scrolled.
+
+   Must come after `.hero > *` above - both are one class worth of
+   specificity, so source order is what lets this stay absolutely positioned.
+   No z-index needed: painting in DOM order already puts it above the ::before
+   gloss and below the content, so the band never crosses the dark text and
+   drags its contrast down.
+
+   The band is parked off-frame at both ends of its travel and the clip box
+   hides it there, so there is never a bright stripe sitting on the card at
+   rest - it exists only while it is crossing. Motion drives the sweep; see
+   LeagueContent.tsx. */
+.hero-sheen {
+  position: absolute; inset: 0; overflow: hidden;
+  border-radius: inherit; pointer-events: none;
+}
+.hero-sheen__band {
+  position: absolute; top: -25%; bottom: -25%; left: 0; width: 32%;
+  background: linear-gradient(100deg,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.55) 50%,
+    rgba(255, 255, 255, 0) 100%);
+  /* Start parked off the left edge; the clip box hides it until it travels. */
+  transform: translateX(-140%) skewX(-18deg);
+}
+
 /* the streak flame disc - always fire, never routed through --hero-* */
 .ember {
   position: relative; width: 88px; height: 88px; flex: none;
@@ -436,14 +466,79 @@ button { font: inherit; color: inherit; border: 0; background: none; cursor: poi
   width: 100%; margin: 8px 0 20px; padding: 4px;
   min-height: 44px; text-align: left;
   border: 0; background: none; cursor: pointer; color: inherit; font: inherit;
+  transition: opacity 0.12s ease;
+}
+.profile-identity:active { opacity: 0.6; }
+/* The disc anchors the row when Onshape gave us no picture - initials, not a
+   stand-in photo, so nothing is implied that we don't actually have. */
+.profile-identity__disc {
+  width: 54px; height: 54px; flex: none; border-radius: var(--r-pill);
+  display: grid; place-items: center; overflow: hidden;
+  background: var(--disc-neutral); color: #fff;
+  font-family: var(--font-rounded); font-size: 20px; font-weight: 800; letter-spacing: 0.5px;
+  box-shadow: 0 4px 0 0 rgba(20, 20, 30, 0.18);
+}
+/* Replaces the old "Tap to edit name" caption: a control says it's tappable
+   better than a line of text explaining that it is. */
+.profile-identity__edit {
+  width: 34px; height: 34px; flex: none; border-radius: var(--r-pill);
+  display: grid; place-items: center;
+  background: var(--surface); color: var(--label-2);
+  box-shadow: 0 3px 0 0 var(--chunk-edge-neutral), var(--card-shadow-rest);
 }
 .profile-edit { margin: 0 0 20px; padding: 16px 18px; display: grid; gap: 14; }
+.expand-in { animation: expand-in 0.22s var(--ease-out) both; }
+@keyframes expand-in {
+  from { opacity: 0; transform: translateY(-6px) scale(0.98); }
+  to { opacity: 1; transform: none; }
+}
 .field { display: grid; gap: 6; }
 .field__label { font-size: 13px; line-height: 16px; font-weight: 800; color: var(--label-2); }
 .field__input {
   min-height: 44px; border: 2px solid var(--separator-strong); border-radius: var(--r-chip);
   padding: 0 14px; font: inherit; font-weight: 700; color: var(--label); background: var(--surface);
 }
+/* --- toggle switch -------------------------------------------------------
+   A real switch instead of the browser's blue checkbox. The native input
+   stays in the markup (keyboard, screen readers, the existing onChange) and
+   is just made invisible on top of the painted track, so nothing about how
+   the setting works changes - only what it looks like.
+   The gradient can't be transitioned (it's a background-image), so the "on"
+   colour is its own layer fading in over the grey track: opacity and
+   transform only, which is also the pair that stays on the GPU. */
+.switch { position: relative; display: inline-flex; flex: none; width: 52px; height: 32px; }
+.switch input {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  margin: 0; opacity: 0; cursor: pointer;
+}
+.switch__track {
+  position: absolute; inset: 0; border-radius: var(--r-pill);
+  background: var(--surface-3);
+  box-shadow: inset 0 2px 4px rgba(20, 20, 30, 0.14);
+  pointer-events: none;
+}
+.switch__track::after {
+  content: ""; position: absolute; inset: 0; border-radius: inherit;
+  background: linear-gradient(120deg, var(--prism-1), var(--prism-2));
+  opacity: 0; transition: opacity 0.18s var(--ease-out);
+}
+.switch__knob {
+  position: absolute; top: 3px; left: 3px; width: 26px; height: 26px;
+  border-radius: var(--r-pill); background: #fff;
+  box-shadow: 0 2px 0 0 rgba(20, 20, 30, 0.14), 0 2px 6px rgba(20, 20, 30, 0.2);
+  transition: transform 0.18s var(--ease-out);
+  pointer-events: none;
+}
+.switch input:checked ~ .switch__track::after { opacity: 1; }
+.switch input:checked ~ .switch__knob { transform: translateX(20px); }
+.switch input:focus-visible ~ .switch__track { outline: 3px solid var(--label); outline-offset: 3px; }
+
+.setting-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 14px;
+  width: 100%; min-height: 52px; cursor: pointer;
+}
+.setting-row + .setting-row { border-top: 2px solid var(--surface-2); }
+
 .swatch-row { display: flex; flex-wrap: wrap; gap: 10px; }
 .swatch {
   width: 44px; height: 44px; border-radius: var(--r-pill);
@@ -459,6 +554,77 @@ button { font: inherit; color: inherit; border: 0; background: none; cursor: poi
   font: inherit; font-weight: 800; color: var(--label-2); cursor: pointer;
 }
 .text-btn--strong { color: var(--label); }
+/* for text actions that sit under a filled CTA - at body size they compete
+   with the button they're meant to defer to */
+.text-btn--sm { font-size: 14px; font-weight: 700; }
+
+/* =========================================================================
+   BUTTONS - the chunky pill family, same solid-edge/press-flush language as
+   .chunk/.badge-tile. League's actions get its own gold (podium-gold is
+   already this screen's semantic everywhere else); .btn-secondary is a
+   lighter tint of the same gold rather than a plain grey chip.
+   ========================================================================= */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  min-height: 48px; padding: 0 20px; border-radius: var(--r-chip);
+  font: inherit; font-size: 15px; font-weight: 800; white-space: nowrap;
+  border: 0; cursor: pointer; text-decoration: none; color: inherit;
+  transition: transform 0.12s var(--ease-out), box-shadow 0.12s var(--ease-out), opacity 0.12s ease;
+}
+.btn:active { transform: translateY(5px); }
+.btn:disabled { opacity: 0.5; cursor: default; transform: none; }
+.btn-block { width: 100%; }
+.btn-sm { min-height: 40px; padding: 0 16px; font-size: 14px; gap: 6px; }
+
+.btn-primary {
+  background: linear-gradient(135deg, var(--gold-2), var(--gold-3));
+  color: var(--label);
+  box-shadow: 0 5px 0 0 var(--gold-edge);
+}
+.btn-primary:active { box-shadow: 0 0 0 0 var(--gold-edge); }
+
+.btn-secondary {
+  background: color-mix(in srgb, var(--gold-3) 18%, var(--surface));
+  color: var(--label);
+  box-shadow: 0 4px 0 0 color-mix(in srgb, var(--gold-edge) 45%, var(--chunk-edge-neutral-strong));
+}
+.btn-secondary:active { box-shadow: 0 0 0 0 color-mix(in srgb, var(--gold-edge) 45%, var(--chunk-edge-neutral-strong)); }
+
+/* Profile has no semantic of its own, so its CTAs take prism - the app's
+   default - the way .btn-primary above takes League's gold. */
+.btn-prism {
+  background: linear-gradient(135deg, var(--prism-1), var(--prism-2));
+  color: var(--label);
+  box-shadow: 0 5px 0 0 var(--prism-edge);
+}
+.btn-prism:active { box-shadow: 0 0 0 0 var(--prism-edge); }
+
+/* Rare/irreversible actions (leave a league, etc): a plain tinted text
+   action, not a pill - it should read as quieter than everything around it,
+   never as the thing your thumb lands on by default. */
+.btn-ghost-danger {
+  min-height: 44px; padding: 0 4px; background: none; box-shadow: none;
+  color: var(--neg); font: inherit; font-weight: 800; border: 0; cursor: pointer;
+}
+.btn-ghost-danger:active { transform: none; opacity: 0.55; }
+
+/* Status lines that appear in response to a tap (push enabled, test sent).
+   Something appearing with no transition reads as a glitch rather than a
+   reply, so it rises the short distance it would have travelled anyway. */
+.reply-in { animation: reply-in 0.2s var(--ease-out) both; }
+@keyframes reply-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* the join-code readout: a large lettered chip, not inline text */
+.code-chip {
+  display: inline-flex; align-items: center;
+  padding: 10px 18px; border-radius: var(--r-chip);
+  background: color-mix(in srgb, var(--gold-3) 18%, var(--surface));
+  font-family: var(--font-rounded); font-variant-numeric: tabular-nums;
+  font-size: 20px; font-weight: 800; letter-spacing: 3px; color: var(--label);
+}
 
 /* =========================================================================
    APP CHROME - glass lives on the tab bar only.

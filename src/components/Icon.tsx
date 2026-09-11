@@ -9,7 +9,7 @@ export type IconName =
   | "today" | "sessions" | "league" | "profile"
   | "chevron" | "back" | "flame" | "clock" | "doc" | "bolt" | "verified"
   | "up" | "down" | "same" | "lock" | "spark" | "flame2" | "check"
-  | "hourglass" | "calendar" | "run" | "trophy" | "layers" | "sunrise" | "crown";
+  | "hourglass" | "calendar" | "run" | "trophy" | "layers" | "sunrise" | "crown" | "copy" | "pencil";
 
 const PATHS: Record<IconName, React.ReactNode> = {
   today: <><path d="M3.6 11.2 12 4l8.4 7.2" /><path d="M5.8 9.6V19a1 1 0 0 0 1 1h10.4a1 1 0 0 0 1-1V9.6" /></>,
@@ -37,6 +37,8 @@ const PATHS: Record<IconName, React.ReactNode> = {
   layers: <><path d="m12 3.4 8.4 4.4L12 12.2 3.6 7.8z" /><path d="m3.6 12.2 8.4 4.4 8.4-4.4" /><path d="m3.6 16.4 8.4 4.4 8.4-4.4" /></>,
   sunrise: <><path d="M12 3.2v3.4M4.6 10.2 6.9 12M19.4 10.2 17.1 12M2.8 17.6h18.4" /><path d="M7.4 17.6a4.6 4.6 0 0 1 9.2 0" /><path d="m8.6 6.6 3.4-3.4 3.4 3.4" /></>,
   crown: <><path d="m3.8 7.4 3.4 3.2 4.8-6 4.8 6 3.4-3.2-1.7 11H5.5z" /><path d="M5.5 20.2h13" /></>,
+  copy: <><rect x="8.6" y="8.6" width="11.6" height="11.6" rx="2.6" /><path d="M15.4 8.6V6a2.6 2.6 0 0 0-2.6-2.6H6a2.6 2.6 0 0 0-2.6 2.6v6.8A2.6 2.6 0 0 0 6 15.4h2.6" /></>,
+  pencil: <><path d="M4.8 19.2v-3.2L15.4 5.4a2.2 2.2 0 0 1 3.2 3.2L8 19.2z" /><path d="m13.6 7.2 3.2 3.2" /></>,
 };
 
 /**

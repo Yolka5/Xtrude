@@ -3,6 +3,12 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { profileImageUrlFromSession } from "@/lib/profileFields";
+import { Icon } from "./Icon";
+
+function initials(name: string) {
+  const parts = name.trim().split(/\s+/).filter(Boolean).slice(0, 2);
+  return parts.map((p) => p[0]).join("").toUpperCase() || "?";
+}
 
 export function ProfileIdentity({
   displayName,
@@ -58,32 +64,28 @@ export function ProfileIdentity({
   return (
     <div>
       <button type="button" className="profile-identity" onClick={openEditor} aria-expanded={editing}>
-        {picture ? (
-          <span
-            className="avatar"
-            style={{
-              width: 54,
-              height: 54,
-              overflow: "hidden",
-              boxShadow: "0 6px 0 0 var(--chunk-edge-neutral-strong)",
-            }}
-            aria-hidden="true"
-          >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
+        <span className="profile-identity__disc" aria-hidden="true">
+          {picture ? (
+            /* eslint-disable-next-line @next/next/no-img-element */
             <img src={picture} alt="" width={54} height={54} style={{ width: 54, height: 54, objectFit: "cover" }} />
-          </span>
-        ) : null}
-        <span className="stack" style={{ gap: 2, textAlign: "left" }}>
+          ) : (
+            initials(name)
+          )}
+        </span>
+        <span className="stack" style={{ gap: 2, textAlign: "left", flex: 1, minWidth: 0 }}>
           <span className="t-title3">{name}</span>
           <span className="t-footnote dim">
             {handle} &middot; since {memberSince}
           </span>
-          <span className="t-caption dimmer">Tap to edit name</span>
         </span>
+        <span className="profile-identity__edit" aria-hidden="true">
+          <Icon name="pencil" size={16} />
+        </span>
+        <span className="sr-only">Edit display name</span>
       </button>
 
       {editing ? (
-        <form className="profile-edit chunk" onSubmit={save}>
+        <form className="profile-edit chunk expand-in" onSubmit={save}>
           <label className="field">
             <span className="field__label">Display name</span>
             <input
@@ -99,7 +101,7 @@ export function ProfileIdentity({
             <button type="button" className="text-btn" onClick={() => setEditing(false)} disabled={saving}>
               Cancel
             </button>
-            <button type="submit" className="text-btn text-btn--strong" disabled={saving}>
+            <button type="submit" className="btn btn-prism btn-sm" disabled={saving}>
               {saving ? "Saving" : "Save"}
             </button>
           </div>

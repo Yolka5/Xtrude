@@ -78,6 +78,37 @@ export function LeagueContent({
 
       <FlyItem>
         <TiltHero className="hero" style={heroStyle} edge="var(--gold-edge)">
+          {/* Light raking across the gold as the card arrives - the one thing a
+              podium-gold surface should do that a flat colour can't. Fires when
+              the hero scrolls into view, the same trigger VerifiedChip's stamp
+              uses, so it plays on arrival rather than on a timer.
+              Slower than a UI transition on purpose: this is decoration at the
+              rare tier, and a glint clipped to 250ms reads as a flicker. It is
+              also the only thing here that is purely decorative, so it is the
+              first thing to drop under Reduce Motion. */}
+          {reduced ? null : (
+            /* The trigger sits on the wrapper, not the band. Watching the band
+               itself never fires: it starts parked outside the clip box, so
+               the observer never sees it come into view and it waits there
+               forever. The wrapper is the hero's own box and is always in
+               view, so it drives the band through a variant instead. */
+            <motion.span
+              className="hero-sheen"
+              aria-hidden="true"
+              initial="parked"
+              whileInView="sweep"
+              viewport={{ once: true, amount: 0.5 }}
+            >
+              <motion.span
+                className="hero-sheen__band"
+                variants={{
+                  parked: { transform: "translateX(-140%) skewX(-18deg)" },
+                  sweep: { transform: "translateX(300%) skewX(-18deg)" },
+                }}
+                transition={{ duration: 0.95, ease: "linear", delay: 0.35 }}
+              />
+            </motion.span>
+          )}
           <div className="spread" style={{ alignItems: "flex-start" }} aria-labelledby="me-h">
             <div className="stack" style={{ gap: 4 }}>
               <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
@@ -147,20 +178,25 @@ export function LeagueContent({
               <motion.li
                 key={m.id}
                 initial={{ y: startOffset, opacity: 0.5 }}
-                animate={{ y: 0, opacity: 1 }}
+                /* On view, not on mount: the climb from last week's slot to
+                   this one is the point of this animation, and past the first
+                   few rows it used to play off-screen and be missed entirely. */
+                whileInView={{ y: 0, opacity: 1 }}
+                viewport={{ once: true, amount: 0.4 }}
                 transition={reduced ? { duration: 0 } : { type: "spring", stiffness: 260, damping: 22, delay: 0.15 + i * 0.05 }}
                 style={{ position: "relative" }}
               >
                 <motion.div
                   className="rowitem"
                   initial={m.isMe ? { backgroundColor: "rgba(250, 165, 46, 0)" } : undefined}
-                  animate={
+                  whileInView={
                     m.isMe
                       ? reduced
                         ? { backgroundColor: "rgba(217, 165, 61, 0.10)" }
                         : { backgroundColor: ["rgba(250, 165, 46, 0)", "rgba(250, 165, 46, 0.55)", "rgba(217, 165, 61, 0.10)"] }
                       : undefined
                   }
+                  viewport={{ once: true, amount: 0.4 }}
                   transition={m.isMe ? (reduced ? { duration: 0 } : { duration: 0.9, delay: 0.5 + i * 0.05, times: [0, 0.35, 1] }) : undefined}
                   style={m.isMe ? { boxShadow: "inset 3px 0 0 0 var(--gold-3)" } : undefined}
                 >

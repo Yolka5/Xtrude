@@ -34,58 +34,81 @@ export function NotificationSettings() {
 
   return (
     <section className="chunk" style={{ marginTop: 8 }}>
-      <p className="t-footnote dim" style={{ margin: "0 0 10px" }}>Notifications</p>
-      <label className="row" style={{ gap: 10, marginBottom: 8 }}>
-        <input
-          type="checkbox"
-          checked={streak}
-          onChange={(e) => void save({ streak: e.target.checked })}
-        />
-        <span className="t-footnote">Streak at risk, evening</span>
+      <div className="section-head" style={{ margin: "0 0 4px" }}>
+        <h2>Notifications</h2>
+      </div>
+
+      <label className="setting-row">
+        <span className="stack" style={{ gap: 2 }}>
+          <span className="t-subhead">Streak at risk</span>
+          <span className="t-caption dimmer">An evening nudge before the day runs out</span>
+        </span>
+        <span className="switch">
+          <input
+            type="checkbox"
+            checked={streak}
+            onChange={(e) => void save({ streak: e.target.checked })}
+          />
+          <span className="switch__track" aria-hidden="true" />
+          <span className="switch__knob" aria-hidden="true" />
+        </span>
       </label>
-      <label className="row" style={{ gap: 10, marginBottom: 12 }}>
-        <input
-          type="checkbox"
-          checked={league}
-          onChange={(e) => void save({ league: e.target.checked })}
-        />
-        <span className="t-footnote">Someone passes you in a league</span>
+
+      <label className="setting-row">
+        <span className="stack" style={{ gap: 2 }}>
+          <span className="t-subhead">Passed in a league</span>
+          <span className="t-caption dimmer">When someone moves ahead of you</span>
+        </span>
+        <span className="switch">
+          <input
+            type="checkbox"
+            checked={league}
+            onChange={(e) => void save({ league: e.target.checked })}
+          />
+          <span className="switch__track" aria-hidden="true" />
+          <span className="switch__knob" aria-hidden="true" />
+        </span>
       </label>
-      <button
-        type="button"
-        className="text-btn text-btn--strong"
-        style={{ paddingLeft: 0 }}
-        onClick={async () => {
-          const err = await enablePush();
-          setStatus(err ?? "Reminders on.");
-        }}
-      >
-        Enable push on this device
-      </button>
-      <button
-        type="button"
-        className="text-btn"
-        style={{ paddingLeft: 0 }}
-        onClick={async () => {
-          try {
-            const res = await fetch("/api/push/test/", { method: "POST" });
-            const json = (await res.json()) as { sent?: number; unavailable?: boolean };
-            if (json.unavailable) setStatus("Push is unavailable on the server.");
-            else if ((json.sent ?? 0) > 0) setStatus("Test sent — check the notification.");
-            else setStatus("No subscription on this device yet. Enable push first.");
-          } catch {
-            setStatus("Push is unavailable right now.");
-          }
-        }}
-      >
-        Send a test notification
-      </button>
+
+      <div className="stack" style={{ gap: 10, marginTop: 16 }}>
+        <button
+          type="button"
+          className="btn btn-prism btn-block"
+          onClick={async () => {
+            const err = await enablePush();
+            setStatus(err ?? "Reminders on.");
+          }}
+        >
+          Enable push on this device
+        </button>
+        <button
+          type="button"
+          className="text-btn text-btn--sm"
+          style={{ alignSelf: "center" }}
+          onClick={async () => {
+            try {
+              const res = await fetch("/api/push/test/", { method: "POST" });
+              const json = (await res.json()) as { sent?: number; unavailable?: boolean };
+              if (json.unavailable) setStatus("Push is unavailable on the server.");
+              else if ((json.sent ?? 0) > 0) setStatus("Test sent — check the notification.");
+              else setStatus("No subscription on this device yet. Enable push first.");
+            } catch {
+              setStatus("Push is unavailable right now.");
+            }
+          }}
+        >
+          Send a test notification
+        </button>
+      </div>
+
       {available === false ? (
-        <p className="t-caption dimmer" style={{ margin: "8px 0 0" }}>
+        <p className="t-caption dimmer reply-in" style={{ margin: "10px 0 0", textAlign: "center" }}>
           Push is unavailable on this server. Today still works.
         </p>
       ) : status ? (
-        <p className="t-caption dimmer" style={{ margin: "8px 0 0" }}>{status}</p>
+        <p key={status} className="t-caption dimmer reply-in" style={{ margin: "10px 0 0", textAlign: "center" }}>
+          {status}
+        </p>
       ) : null}
     </section>
   );
