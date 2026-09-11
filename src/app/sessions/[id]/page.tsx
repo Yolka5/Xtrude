@@ -6,37 +6,30 @@ import { FlyItem } from "@/components/FlyItem";
 import { Icon } from "@/components/Icon";
 import { SetNavTitle } from "@/components/NavTitle";
 import { SCORING } from "@/lib/fixtures";
-import { getRealData, getSessionDocuments } from "@/lib/db/queries";
+import { getSessionDetail } from "@/lib/db/queries";
 import { clockTime, dayLabel, duration, durationSpoken, longDate, plural } from "@/lib/format";
 import { docColor } from "@/lib/docColor";
 
 export const dynamic = "force-dynamic";
 
-export default async function SessionDetail({ params }: { params: Promise<{ id: string }> }) {
+export default async function SessionDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const { sessions } = await getRealData();
-  const found = sessions.find((s) => s.id === id);
-  if (!found) notFound();
+  const session = await getSessionDetail(id);
+  if (!session) notFound();
 
-  // The list-level pass fills `documents` with names only (edits: 0
-  // placeholders, see queries.ts) - detail is the one screen that shows a
-  // per-document edit count, so it's worth the one extra query to get it
-  // right here.
-  const documents = await getSessionDocuments(id, found.documents);
-  const session = { ...found, documents };
-
-  const rawPct = (session.rawMinutes / session.scoredMinutes) * 100;
-
-  // Document colour overrides prism on this hero - the one place besides the
-  // session-row dot that a document's hue appears. Multi-document sessions
-  // are coloured by the primary (first) document, matching how its name is
-  // already treated as primary throughout the row/card components.
-  const doc = docColor(session.documents[0].name);
-  const heroStyle = {
-    "--hero-1": doc.heroLight,
-    "--hero-2": doc.heroMid,
-    "--doc-deep": doc.deep,
-  } as React.CSSProperties;
+  const rawPct = session.scoredMinutes > 0 ? (session.rawMinutes / session.scoredMinutes) * 100 : 100;
+  const q = session.qualification;
+  const primary = session.documents[0];
+  const heroStyle = primary
+    ? (() => {
+        const doc = docColor(primary.name);
+        return {
+          "--hero-1": doc.heroLight,
+          "--hero-2": doc.heroMid,
+          "--doc-deep": doc.deep,
+        } as React.CSSProperties;
+      })()
+    : undefined;
 
   return (
     <main className="screen">
@@ -45,10 +38,11 @@ export default async function SessionDetail({ params }: { params: Promise<{ id: 
         <h1 className="screen__title">{dayLabel(session.date)}</h1>
         <p className="screen__subtitle t-subhead">
           {longDate(session.date)} &middot; {clockTime(session.start)} &ndash; {clockTime(session.end)}
+          {" · "}
+          {duration(session.rawMinutes)} observed
         </p>
       </FlyItem>
 
-      {/* Hero: the scored time, coloured by this session's document. */}
       <FlyItem>
         <TiltHero className="hero" style={heroStyle} edge="var(--doc-deep)">
           <div className="spread" style={{ alignItems: "flex-start" }} aria-labelledby="scored-h">
@@ -67,7 +61,6 @@ export default async function SessionDetail({ params }: { params: Promise<{ id: 
 
           <div className="hero-rule" />
 
-          {/* raw vs scored, inside the hero because it is the same number */}
           <div
             className="deltabar"
             role="img"
@@ -87,7 +80,6 @@ export default async function SessionDetail({ params }: { params: Promise<{ id: 
         </TiltHero>
       </FlyItem>
 
-      {/* Supporting stats */}
       <FlyItem>
         <section className="chunk" style={{ marginTop: 12 }}>
           <div className="row" style={{ justifyContent: "space-between" }}>
@@ -116,10 +108,42 @@ export default async function SessionDetail({ params }: { params: Promise<{ id: 
         <section className="chunk">
           <div className="kv">
             <span className="kv__k">
-              Raw span
+              Started
+              <span className="t-caption dimmer" style={{ display: "block" }}>First edit</span>
+            </span>
+            <span className="kv__v">{clockTime(session.start)}</span>
+          </div>
+          <div className="kv">
+            <span className="kv__k">
+              Ended
+              <span className="t-caption dimmer" style={{ display: "block" }}>Last edit</span>
+            </span>
+            <span className="kv__v">{clockTime(session.end)}</span>
+          </div>
+          <div className="kv">
+            <span className="kv__k">
+              Duration
               <span className="t-caption dimmer" style={{ display: "block" }}>First edit to last edit</span>
             </span>
-            <span className="kv__v">{session.rawMinutes} min</span>
+            <span className="kv__v">{duration(session.rawMinutes)}</span>
+          </div>
+          <div className="kv">
+            <span className="kv__k">
+              Raw event count
+              <span className="t-caption dimmer" style={{ display: "block" }}>
+                Need ≥{q.minEvents} to count as a session
+              </span>
+            </span>
+            <span className="kv__v">{q.eventCount}</span>
+          </div>
+          <div className="kv">
+            <span className="kv__k">
+              Raw span
+              <span className="t-caption dimmer" style={{ display: "block" }}>
+                Need ≥{q.minSpanMinutes} minutes to count as a session
+              </span>
+            </span>
+            <span className="kv__v">{q.spanMinutes} min</span>
           </div>
           <div className="kv">
             <span className="kv__k">
@@ -134,34 +158,38 @@ export default async function SessionDetail({ params }: { params: Promise<{ id: 
           </div>
           <p className="t-caption dimmer" style={{ margin: "12px 0 0" }}>
             Edits more than {SCORING.idleThresholdMinutes} minutes apart start a new session.
-            Clusters under 2 edits, or spanning under 2 minutes, are discarded as noise, and no
+            Clusters under {q.minEvents} edits, or spanning under {q.minSpanMinutes} minutes, are discarded as noise, and no
             single session is credited past {SCORING.maxSessionHours} hours.
           </p>
         </section>
       </FlyItem>
 
-      <FlyItem>
-        <div className="section-head">
-          <h2>{session.documents.length === 1 ? "Document touched" : "Documents touched"}</h2>
-        </div>
-        <div className="rows">
-          {session.documents.map((d) => (
-            <div key={d.name + d.tab} className="rowitem">
-              <span className="avatar" style={{ width: 34, height: 34 }} aria-hidden="true">
-                <Icon name="doc" size={17} />
-              </span>
-              <span className="rowitem__grow stack" style={{ gap: 2 }}>
-                <span className="row" style={{ gap: 6 }}>
-                  <DocDot name={d.name} />
-                  <span className="rowitem__name">{d.name}</span>
+      {session.documents.length > 0 ? (
+        <FlyItem>
+          <div className="section-head">
+            <h2>{session.documents.length === 1 ? "Document touched" : "Documents touched"}</h2>
+          </div>
+          <div className="rows">
+            {session.documents.map((d) => (
+              <div key={d.name + d.tab} className="rowitem">
+                <span className="avatar" style={{ width: 34, height: 34 }} aria-hidden="true">
+                  <Icon name="doc" size={17} />
                 </span>
-                <span className="rowitem__meta">{d.tab}</span>
-              </span>
-              <span className="rowitem__value" style={{ fontSize: 15 }}>{plural(d.edits, "edit")}</span>
-            </div>
-          ))}
-        </div>
-      </FlyItem>
+                <span className="rowitem__grow stack" style={{ gap: 2 }}>
+                  <span className="row" style={{ gap: 6 }}>
+                    <DocDot name={d.name} />
+                    <span className="rowitem__name">{d.name}</span>
+                  </span>
+                  {d.tab ? <span className="rowitem__meta">{d.tab}</span> : null}
+                </span>
+                {d.edits != null ? (
+                  <span className="rowitem__value" style={{ fontSize: 15 }}>{plural(d.edits, "edit")}</span>
+                ) : null}
+              </div>
+            ))}
+          </div>
+        </FlyItem>
+      ) : null}
 
       <FlyItem>
         <div className="section-head"><h2>Verification</h2></div>

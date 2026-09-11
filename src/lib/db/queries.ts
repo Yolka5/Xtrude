@@ -1,8 +1,12 @@
 import "server-only";
 import { getSupabase } from "./client";
 import { deriveRealData, type RealData } from "./derive";
-import type { TouchedDocument } from "@/lib/fixtures";
 import { getCurrentUserId } from "@/lib/auth/currentUser";
+import { assembleSessionDocuments, sessionQualification, type SessionDocCount } from "@/lib/sessionDetail";
+import { calendarDateInZone, clockHmInZone } from "../../../scripts/lib/timezone.mjs";
+import { storedOnshapeImageUrl } from "@/lib/auth/tokens";
+import { memberSinceLabel, sanitizeDisplayName } from "@/lib/profileFields";
+import { initialsFromDisplayName } from "@/lib/localProfile";
 
 export type { RealData };
 
@@ -67,40 +71,111 @@ export async function getLastSyncAt(): Promise<number | null> {
   }
 }
 
-/** Session detail needs a real per-document edit breakdown, which the
- * `sessions` table doesn't store (only the document id list) - this range
- * query over `events` reproduces it exactly, since a session's own events
- * are, by construction, every event between its start and end timestamps.
- * Looks the session's raw timestamps up by id rather than reconstructing
- * them from the display-oriented `Session` type (date + "HH:MM" strings,
- * which lose the actual day boundary for a session that runs past
- * midnight). Falls back to `fallback` (edits: 0 placeholders) on any error
- * so a lookup failure degrades to "no breakdown," never a broken page. */
-export async function getSessionDocuments(sessionId: string, fallback: TouchedDocument[]): Promise<TouchedDocument[]> {
+export type SessionDetail = {
+  id: string;
+  date: string;
+  start: string;
+  end: string;
+  rawMinutes: number;
+  scoredMinutes: number;
+  leadInMinutes: number;
+  eventCount: number;
+  verified: boolean;
+  documents: SessionDocCount[];
+  qualification: ReturnType<typeof sessionQualification>;
+};
+
+/**
+ * One session from `sessions` plus the events that fell in its timestamp
+ * range. Document edit counts are real event totals. If events are missing
+ * we still list `document_ids` by name, with `edits: null` — never a fake 0.
+ */
+export async function getSessionDetail(sessionId: string): Promise<SessionDetail | null> {
   const userId = await getCurrentUserId();
-  const { data: sessionRow, error: sessionErr } = await getSupabase()
+  const sb = getSupabase();
+  const { data: row, error } = await sb
     .from("sessions")
-    .select("started_at, ended_at")
+    .select("id, started_at, ended_at, raw_minutes, scored_minutes, event_count, document_ids")
     .eq("user_id", userId)
     .eq("id", sessionId)
-    .single();
-  if (sessionErr || !sessionRow) return fallback;
+    .maybeSingle();
+  if (error || !row) return null;
 
-  const { data, error } = await getSupabase()
+  const { data: eventRows } = await sb
     .from("events")
     .select("occurred_at, tracked_documents(name)")
     .eq("user_id", userId)
-    .gte("occurred_at", sessionRow.started_at)
-    .lte("occurred_at", sessionRow.ended_at)
+    .gte("occurred_at", row.started_at)
+    .lte("occurred_at", row.ended_at)
     .order("occurred_at", { ascending: true });
-  if (error || !data) return fallback;
 
-  const counts = new Map<string, number>();
-  for (const row of data) {
-    const name = (row as unknown as { tracked_documents: { name: string } | null }).tracked_documents?.name;
-    if (!name) continue;
-    counts.set(name, (counts.get(name) ?? 0) + 1);
-  }
-  if (counts.size === 0) return fallback;
-  return [...counts.entries()].map(([name, edits]) => ({ name, tab: "", edits }));
+  const documentIds = Array.isArray(row.document_ids) ? (row.document_ids as string[]) : [];
+  const { data: docs } = documentIds.length
+    ? await sb
+        .from("tracked_documents")
+        .select("onshape_document_id, name")
+        .eq("user_id", userId)
+        .in("onshape_document_id", documentIds)
+    : { data: [] as { onshape_document_id: string; name: string }[] };
+
+  const nameByOnshapeId = new Map(
+    (docs ?? []).map((d) => [d.onshape_document_id as string, d.name as string])
+  );
+  const eventNames = (eventRows ?? []).map((ev) => ({
+    documentName:
+      (ev as unknown as { tracked_documents: { name: string } | null }).tracked_documents?.name ?? null,
+  }));
+
+  const eventCount = Math.round(Number(row.event_count) || 0);
+  const rawMinutes = Math.round(Number(row.raw_minutes) || 0);
+  const start = new Date(row.started_at as string);
+  const end = new Date(row.ended_at as string);
+
+  return {
+    id: row.id as string,
+    date: calendarDateInZone(start),
+    start: clockHmInZone(start),
+    end: clockHmInZone(end),
+    rawMinutes,
+    scoredMinutes: Math.round(Number(row.scored_minutes) || 0),
+    leadInMinutes: 5,
+    eventCount,
+    verified: false,
+    documents: assembleSessionDocuments({ eventNames, documentIds, nameByOnshapeId }),
+    qualification: sessionQualification(eventCount, rawMinutes),
+  };
+}
+
+export type AccountProfile = {
+  displayName: string;
+  memberSince: string;
+  imageUrl: string | null;
+};
+
+export async function getAccountProfile(): Promise<AccountProfile> {
+  const userId = await getCurrentUserId();
+  const { data } = await getSupabase()
+    .from("users")
+    .select("display_name, created_at")
+    .eq("id", userId)
+    .maybeSingle();
+  const imageUrl = await storedOnshapeImageUrl(userId);
+  return {
+    displayName: typeof data?.display_name === "string" && data.display_name.trim() ? data.display_name : "You",
+    memberSince: memberSinceLabel(data?.created_at as string | undefined) ?? "-",
+    imageUrl,
+  };
+}
+
+export async function updateUserDisplayName(raw: string): Promise<{ displayName: string; initials: string }> {
+  const userId = await getCurrentUserId();
+  const displayName = sanitizeDisplayName(raw, "");
+  if (!displayName) throw new Error("Display name cannot be empty.");
+  const initials = initialsFromDisplayName(displayName);
+  const { error } = await getSupabase()
+    .from("users")
+    .update({ display_name: displayName, initials })
+    .eq("id", userId);
+  if (error) throw new Error(error.message);
+  return { displayName, initials };
 }
