@@ -17,3 +17,8 @@ I did not stop for these. Defaults I used are in brackets.
 7. **Invite click-through** — Logged-out `/join/?code=` → `/connect/` → OAuth → league is wired and unit-tested. Not clicked on a real URL this session (no deploy). [Try on preview: copy the invite link from League, open it logged out.]
 
 8. **Today first-run in the browser** — Copy is unit-tested. Did not open local Today against the live project (that would background-sync with Onshape keys). [Looks right on an account with zero sessions.]
+
+9. **sessioninfo `image`** — OpenAPI types it as a string, not a URI. [Use as a profile picture only when it is `http://` or `https://`. Capture at OAuth callback. Skip avatars otherwise.]
+
+10. **Onshape call cap** — [Default 100 per cron/backfill/discovery run via `ONSHAPE_MAX_CALLS_PER_RUN`. Remaining work waits for the next run.]
+
