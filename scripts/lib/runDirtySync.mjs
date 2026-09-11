@@ -14,6 +14,7 @@
 import { makeClient } from "./onshape.mjs";
 import { rebuildSessions } from "./sessionRebuild.mjs";
 import { ingestDocumentHistory } from "./ingestDocument.mjs";
+import { APP_USER_ID } from "./appUser.mjs";
 
 export const MAX_SYNC_ONSHAPE_CALLS = 20;
 
@@ -35,7 +36,8 @@ export async function runDirtySync(supabase, { accessKey, secretKey, now = new D
 
   const { data: dirtyDocs, error: dirtyErr } = await supabase
     .from("tracked_documents")
-    .select("id, onshape_document_id, onshape_workspace_id, name, last_notified_at, last_synced_at")
+    .select("id, onshape_document_id, onshape_workspace_id, name, last_notified_at, last_synced_at, user_id")
+    .eq("user_id", APP_USER_ID)
     .not("last_notified_at", "is", null);
   if (dirtyErr) throw new Error(`load_failed: ${dirtyErr.message}`);
 

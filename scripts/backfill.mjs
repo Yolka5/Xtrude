@@ -20,6 +20,7 @@
 import { loadEnv, requireEnv } from "./lib/env.mjs";
 import { makeClient } from "./lib/onshape.mjs";
 import { createClient } from "@supabase/supabase-js";
+import { APP_USER_ID } from "./lib/appUser.mjs";
 
 loadEnv();
 
@@ -132,12 +133,13 @@ async function main() {
       .from("tracked_documents")
       .upsert(
         {
+          user_id: APP_USER_ID,
           onshape_document_id: doc.id,
           onshape_workspace_id: workspaceId,
           name: doc.name,
           last_backfilled_at: new Date().toISOString(),
         },
-        { onConflict: "onshape_document_id" }
+        { onConflict: "user_id,onshape_document_id" }
       )
       .select()
       .single();
@@ -154,6 +156,7 @@ async function main() {
         const occurredAt = row.date ?? row.createdAt ?? row.time;
         if (!microversionId || !occurredAt) return null;
         return {
+          user_id: APP_USER_ID,
           document_id: trackedDoc.id,
           element_id: row.elementId ?? row.element ?? null,
           microversion_id: String(microversionId),
@@ -183,6 +186,7 @@ async function main() {
     const { count: totalForDoc } = await supabase
       .from("events")
       .select("*", { count: "exact", head: true })
+      .eq("user_id", APP_USER_ID)
       .eq("document_id", trackedDoc.id);
 
     console.log(

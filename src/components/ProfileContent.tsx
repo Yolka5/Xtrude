@@ -12,6 +12,7 @@ import type { Badge, DayTotal, PersonalRecord, ProfileStats } from "@/lib/fixtur
 import { duration, plural, shortDate } from "@/lib/format";
 import { haptics } from "@/lib/haptics";
 import { burstAt, celebrate } from "@/lib/confetti";
+import { ProfileIdentity } from "@/components/ProfileIdentity";
 
 const PRISM_CONFETTI = ["#9e74e7", "#f04cf0", "#ff52a8"];
 
@@ -108,23 +109,7 @@ export function ProfileContent({
       {/* Identity - intentionally minimal so it doesn't compete with the hero */}
       <FlyItem>
         <h1 className="screen__title">Profile</h1>
-        <div className="row" style={{ gap: 14, margin: "8px 4px 20px" }}>
-          <span
-            className="avatar"
-            style={{
-              width: 54, height: 54, fontSize: 19,
-              background: "var(--disc-neutral)",
-              color: "#fff", boxShadow: "0 6px 0 0 var(--chunk-edge-neutral-strong)",
-            }}
-            aria-hidden="true"
-          >
-            {profile.initials}
-          </span>
-          <div className="stack" style={{ gap: 2 }}>
-            <span className="t-title3">{profile.name}</span>
-            <span className="t-footnote dim">{profile.handle} &middot; since {profile.memberSince}</span>
-          </div>
-        </div>
+        <ProfileIdentity handle={profile.handle} memberSince={profile.memberSince} />
       </FlyItem>
 
       {/* Hero: the all-time heatmap. Profile has no colour of its own, so

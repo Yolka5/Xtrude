@@ -28,18 +28,18 @@ import type {
   PersonalRecord,
   Badge,
 } from "@/lib/fixtures";
+import { calendarDateInZone, clockHmInZone } from "../../../scripts/lib/timezone.mjs";
 
 const DAY_MS = 86_400_000;
 
-function isoDate(ms: number): string {
-  return new Date(ms).toISOString().slice(0, 10);
-}
 function addDaysIso(date: string, days: number): string {
-  return isoDate(Date.parse(`${date}T00:00:00Z`) + days * DAY_MS);
+  const ms = Date.parse(`${date}T12:00:00Z`) + days * DAY_MS;
+  return calendarDateInZone(new Date(ms), "UTC");
 }
-/** Monday=0 .. Sunday=6, matching gen-fixtures.mjs's convention. */
-function mondayIndexedDow(ms: number): number {
-  return (new Date(ms).getUTCDay() + 6) % 7;
+
+/** Monday=0 .. Sunday=6 for a civil YYYY-MM-DD (timezone-independent). */
+function mondayIndexedDowFromDate(isoDate: string): number {
+  return (new Date(`${isoDate}T12:00:00Z`).getUTCDay() + 6) % 7;
 }
 
 export interface RealData {
@@ -76,7 +76,7 @@ export function deriveRealData(
   docNameById: Map<string, string>,
   todayMs: number
 ): RealData {
-  const today = isoDate(todayMs);
+  const today = calendarDateInZone(todayMs);
 
   const sessions: Session[] = sessionRows.map((row) => {
     const start = new Date(row.started_at);
@@ -92,9 +92,9 @@ export function deriveRealData(
     }));
     return {
       id: row.id,
-      date: isoDate(start.getTime()),
-      start: start.toISOString().slice(11, 16),
-      end: end.toISOString().slice(11, 16),
+      date: calendarDateInZone(start),
+      start: clockHmInZone(start),
+      end: clockHmInZone(end),
       rawMinutes: Math.round(row.raw_minutes),
       scoredMinutes: Math.round(row.scored_minutes),
       leadInMinutes: 5,
@@ -147,13 +147,12 @@ export function deriveRealData(
     }
   }
 
-  // --- this week, Monday-anchored -------------------------------------------
-  const mondayOffset = mondayIndexedDow(todayMs);
-  const weekStartMs = todayMs - mondayOffset * DAY_MS;
+  // --- this week, Monday-anchored in Asia/Jerusalem civil dates -------------
+  const mondayOffset = mondayIndexedDowFromDate(today);
+  const weekStart = addDaysIso(today, -mondayOffset);
   const LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
   const week: WeekDay[] = LABELS.map((label, i) => {
-    const ms = weekStartMs + i * DAY_MS;
-    const date = isoDate(ms);
+    const date = addDaysIso(weekStart, i);
     const d = byDate.get(date) ?? { date, scoredMinutes: 0, sessions: 0 };
     return {
       label,
@@ -161,13 +160,14 @@ export function deriveRealData(
       scoredMinutes: d.scoredMinutes,
       sessions: d.sessions,
       isToday: d.date === today,
-      isFuture: ms > todayMs,
+      isFuture: date > today,
     };
   });
   const weekMinutes = week.reduce((a, d) => a + d.scoredMinutes, 0);
 
+  const lastWeekStart = addDaysIso(weekStart, -7);
   const lastWeekMinutes = LABELS.reduce((sum, _label, i) => {
-    const date = isoDate(weekStartMs - 7 * DAY_MS + i * DAY_MS);
+    const date = addDaysIso(lastWeekStart, i);
     return sum + (byDate.get(date)?.scoredMinutes ?? 0);
   }, 0);
 
@@ -242,9 +242,8 @@ export function deriveRealData(
   // earned honestly in Phase 1 - no verification, and League is still
   // fixtures - so both are hidden from the grid entirely rather than shown
   // locked, which would invite "why can I never earn this." b11 ("20
-  // sessions before 8am") needs a real local timezone, which doesn't exist
-  // yet (recompute-sessions.mjs buckets by UTC day - see its header comment)
-  // so a real 8am cutoff can't be trusted either; hidden for the same reason.
+  // sessions before 8am") is still hidden: local-clock grouping exists now
+  // (Asia/Jerusalem) but the badge itself is not wired in this pass.
   const maxScored = sessions.length ? Math.max(...sessions.map((s) => s.scoredMinutes)) : 0;
   let mostDocsInAWeek = 0;
   for (let i = 0; i + 7 <= daily.length; i++) {

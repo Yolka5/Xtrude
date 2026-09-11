@@ -7,10 +7,10 @@ import { Icon, type IconName } from "./Icon";
 import { haptics } from "@/lib/haptics";
 
 const TABS: { href: string; label: string; icon: IconName; match: RegExp }[] = [
-  { href: "/",         label: "Today",    icon: "today",    match: /^\/$/ },
-  { href: "/sessions", label: "Sessions", icon: "sessions", match: /^\/sessions/ },
-  { href: "/league",   label: "League",   icon: "league",   match: /^\/league/ },
-  { href: "/profile",  label: "Profile",  icon: "profile",  match: /^\/profile/ },
+  { href: "/",          label: "Today",    icon: "today",    match: /^\/$/ },
+  { href: "/sessions/", label: "Sessions", icon: "sessions", match: /^\/sessions/ },
+  { href: "/league/",   label: "League",   icon: "league",   match: /^\/league/ },
+  { href: "/profile/",  label: "Profile",  icon: "profile",  match: /^\/profile/ },
 ];
 
 /**

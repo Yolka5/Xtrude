@@ -10,6 +10,7 @@
  */
 import { deriveRealData } from "../src/lib/db/derive";
 import { clusterSessions, MIN_EVENTS, MIN_SPAN_MINUTES } from "./lib/sessionAlgorithm.mjs";
+import { calendarDateInZone, clockHmInZone } from "./lib/timezone.mjs";
 
 const DAY = 86_400_000;
 // Fix "today" to a known Wednesday: 2026-09-09 12:00 UTC (matches the app's
@@ -208,5 +209,51 @@ for (const c of clusterCases) {
   );
 }
 
+// Asia/Jerusalem day boundary (DST, UTC+3 on 12 Sep 2026).
+// 00:30 local = 21:30 UTC previous calendar day; 23:30 local = 20:30 UTC same UTC day.
+const israelMidnight = "2026-09-11T21:30:00.000Z"; // 00:30 IDT on 12 Sep
+const israelLate = "2026-09-12T20:30:00.000Z"; // 23:30 IDT on 12 Sep
+check(
+  "00:30 Israel lands on that local calendar day, not UTC yesterday",
+  calendarDateInZone(israelMidnight) === "2026-09-12" && clockHmInZone(israelMidnight) === "00:30",
+  `date=${calendarDateInZone(israelMidnight)} time=${clockHmInZone(israelMidnight)}`
+);
+check(
+  "23:30 Israel does not roll into tomorrow",
+  calendarDateInZone(israelLate) === "2026-09-12" && clockHmInZone(israelLate) === "23:30",
+  `date=${calendarDateInZone(israelLate)} time=${clockHmInZone(israelLate)}`
+);
+
+const edgeRows: Parameters<typeof deriveRealData>[0] = [
+  {
+    id: "early",
+    started_at: israelMidnight,
+    ended_at: "2026-09-11T21:50:00.000Z",
+    raw_minutes: 20,
+    scored_minutes: 25,
+    event_count: 4,
+    document_ids: ["doc1"],
+  },
+  {
+    id: "late",
+    started_at: israelLate,
+    ended_at: "2026-09-12T20:50:00.000Z",
+    raw_minutes: 20,
+    scored_minutes: 25,
+    event_count: 4,
+    document_ids: ["doc1"],
+  },
+];
+const edgeDaily = [
+  { date: "2026-09-12", total_scored_minutes: 50, session_count: 2 },
+];
+const edge = deriveRealData(edgeRows, edgeDaily, docNameById, Date.parse("2026-09-12T07:00:00.000Z"));
+check("derive: 00:30 Israel session.date is 2026-09-12", edge.sessions.find((s) => s.id === "early")?.date === "2026-09-12", JSON.stringify(edge.sessions.find((s) => s.id === "early")));
+check("derive: 00:30 Israel clock is 12:30 AM", edge.sessions.find((s) => s.id === "early")?.start === "00:30", "");
+check("derive: 23:30 Israel session.date stays 2026-09-12", edge.sessions.find((s) => s.id === "late")?.date === "2026-09-12", JSON.stringify(edge.sessions.find((s) => s.id === "late")));
+check("derive: 23:30 Israel clock is 11:30 PM", edge.sessions.find((s) => s.id === "late")?.start === "23:30", "");
+check("derive: today in Jerusalem at 10:00 IDT is 2026-09-12", edge.today === "2026-09-12", `got ${edge.today}`);
+
 console.log(failures ? `\n${failures} check(s) FAILED` : "\nAll checks pass.");
 process.exit(failures ? 1 : 0);
+

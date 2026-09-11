@@ -1,6 +1,7 @@
 import "server-only";
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabase } from "@/lib/db/client";
+import { APP_USER_ID } from "../../../../../scripts/lib/appUser.mjs";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -41,6 +42,7 @@ async function logDelivery(params: {
   ip: string | null;
 }) {
   const { error } = await getSupabase().from("webhook_deliveries").insert({
+    user_id: APP_USER_ID,
     onshape_webhook_id: params.webhookId,
     event: params.event,
     document_id: params.documentId,
@@ -80,6 +82,7 @@ export async function POST(req: NextRequest) {
   const { count: recentCount, error: countErr } = await getSupabase()
     .from("webhook_deliveries")
     .select("*", { count: "exact", head: true })
+    .eq("user_id", APP_USER_ID)
     .gte("received_at", since);
   if (!countErr && (recentCount ?? 0) >= RATE_LIMIT_MAX) {
     await logDelivery({ webhookId, event, documentId: null, accepted: false, reason: "rate_limited", raw: payload, ip });
@@ -93,8 +96,9 @@ export async function POST(req: NextRequest) {
 
   const { data: registration, error: regErr } = await getSupabase()
     .from("webhook_registrations")
-    .select("id, document_id, events, active")
+    .select("id, document_id, events, active, user_id")
     .eq("onshape_webhook_id", webhookId)
+    .eq("user_id", APP_USER_ID)
     .eq("active", true)
     .maybeSingle();
 
@@ -148,7 +152,8 @@ export async function POST(req: NextRequest) {
   const { error: touchErr } = await getSupabase()
     .from("tracked_documents")
     .update({ last_notified_at: new Date().toISOString() })
-    .eq("id", registration.document_id);
+    .eq("id", registration.document_id)
+    .eq("user_id", registration.user_id);
   if (touchErr) console.error("tracked_documents touch failed:", touchErr.message);
 
   await logDelivery({

@@ -7,13 +7,14 @@ import { rebuildSessions } from "../../../../../scripts/lib/sessionRebuild.mjs";
 import { snapshotStreak } from "../../../../../scripts/lib/streakSnapshot.mjs";
 import { requireEnv } from "@/lib/env";
 import { cronAuthorized, unauthorizedCron } from "@/lib/cronAuth";
+import { APP_USER_ID } from "../../../../../scripts/lib/appUser.mjs";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
 /**
- * Daily Vercel Cron (midnight Asia/Jerusalem, 21:00 UTC): the only way a
+ * Daily Vercel Cron (22:00 UTC = midnight IST / 01:00 IDT): the only way a
  * document created after the last wipe ever gets watched. Onshape webhooks
  * are registered per documentId, so a brand-new document has no
  * registration until something finds it and calls createWebhook.
@@ -75,7 +76,8 @@ async function handle(req: NextRequest) {
 
     const { data: existingDocs, error: existingErr } = await supabase
       .from("tracked_documents")
-      .select("id, onshape_document_id");
+      .select("id, onshape_document_id")
+      .eq("user_id", APP_USER_ID);
     if (existingErr) throw new Error(`loading tracked_documents: ${existingErr.message}`);
     const knownIds = new Set((existingDocs ?? []).map((d) => d.onshape_document_id));
 
@@ -85,7 +87,12 @@ async function handle(req: NextRequest) {
         const workspaceId = await onshape.getDefaultWorkspaceId(doc);
         const { data: inserted, error: insertErr } = await supabase
           .from("tracked_documents")
-          .insert({ onshape_document_id: doc.id, onshape_workspace_id: workspaceId, name: doc.name })
+          .insert({
+            user_id: APP_USER_ID,
+            onshape_document_id: doc.id,
+            onshape_workspace_id: workspaceId,
+            name: doc.name,
+          })
           .select()
           .single();
         if (insertErr) throw new Error(`inserting tracked_documents: ${insertErr.message}`);
@@ -103,7 +110,8 @@ async function handle(req: NextRequest) {
     // re-run cannot re-pull their (truncated-at-50) history.
     const { data: needsBackfill, error: backfillErr } = await supabase
       .from("tracked_documents")
-      .select("id, onshape_document_id, onshape_workspace_id, name")
+      .select("id, onshape_document_id, onshape_workspace_id, name, user_id")
+      .eq("user_id", APP_USER_ID)
       .is("last_backfilled_at", null);
     if (backfillErr) throw new Error(`loading un-backfilled documents: ${backfillErr.message}`);
 
@@ -124,12 +132,14 @@ async function handle(req: NextRequest) {
 
     const { data: allDocs, error: allErr } = await supabase
       .from("tracked_documents")
-      .select("id, onshape_document_id, name");
+      .select("id, onshape_document_id, name")
+      .eq("user_id", APP_USER_ID);
     if (allErr) throw new Error(`reloading tracked_documents: ${allErr.message}`);
 
     const { data: activeRegs, error: regErr } = await supabase
       .from("webhook_registrations")
       .select("document_id")
+      .eq("user_id", APP_USER_ID)
       .eq("active", true);
     if (regErr) throw new Error(`loading webhook_registrations: ${regErr.message}`);
     const registered = new Set((activeRegs ?? []).map((r) => r.document_id));
@@ -142,9 +152,17 @@ async function handle(req: NextRequest) {
       }
       try {
         const info = await onshape.registerWebhook({ documentId: doc.onshape_document_id, events: EVENTS, url: webhookUrl });
-        const { error: regInsertErr } = await supabase
-          .from("webhook_registrations")
-          .insert({ onshape_webhook_id: info.id, document_id: doc.id, events: EVENTS, active: true });
+        const { error: regInsertErr } = await supabase.from("webhook_registrations").upsert(
+          {
+            user_id: APP_USER_ID,
+            onshape_webhook_id: info.id,
+            document_id: doc.id,
+            events: EVENTS,
+            active: true,
+            unregistered_at: null,
+          },
+          { onConflict: "document_id" }
+        );
         if (regInsertErr) {
           await onshape.unregisterWebhook(info.id).catch(() => {});
           throw new Error(`saving registration: ${regInsertErr.message}`);

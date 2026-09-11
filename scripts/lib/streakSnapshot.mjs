@@ -6,17 +6,18 @@
  * The daily discovery job writes this so a missed day is recorded at
  * midnight even if nobody opens the app.
  */
+import { calendarDateInZone } from "./timezone.mjs";
+import { APP_USER_ID } from "./appUser.mjs";
+
 const DAY_MS = 86_400_000;
 
-function isoDate(ms) {
-  return new Date(ms).toISOString().slice(0, 10);
-}
 function addDaysIso(date, days) {
-  return isoDate(Date.parse(`${date}T00:00:00Z`) + days * DAY_MS);
+  const ms = Date.parse(`${date}T12:00:00Z`) + days * DAY_MS;
+  return calendarDateInZone(new Date(ms), "UTC");
 }
 
 export function streakFromDaily(dailyRows, now = new Date()) {
-  const today = isoDate(now.getTime());
+  const today = calendarDateInZone(now);
   const byDate = new Map((dailyRows ?? []).map((d) => [d.date, d]));
 
   const todayActive = (byDate.get(today)?.session_count ?? 0) > 0;
@@ -50,6 +51,7 @@ export async function snapshotStreak(supabase, now = new Date()) {
   const { data, error } = await supabase
     .from("daily_stats")
     .select("date, session_count")
+    .eq("user_id", APP_USER_ID)
     .order("date", { ascending: true });
   if (error) throw new Error(`loading daily_stats for streak: ${error.message}`);
   return streakFromDaily(data ?? [], now);

@@ -1,4 +1,5 @@
 import { getSupabase } from "@/lib/db/client";
+import { APP_USER_ID } from "../../../scripts/lib/appUser.mjs";
 
 export const dynamic = "force-dynamic";
 
@@ -38,6 +39,7 @@ export default async function AdminPage() {
   const { data: deliveries, error: deliveriesErr } = await supabase
     .from("webhook_deliveries")
     .select("id, received_at, onshape_webhook_id, event, accepted, reason, ip, tracked_documents(name)")
+    .eq("user_id", APP_USER_ID)
     .order("received_at", { ascending: false })
     .limit(50);
 
@@ -87,7 +89,7 @@ export default async function AdminPage() {
         <StatusCard
           label="Last daily discovery"
           value={lastDiscovery ? timeAgo(lastDiscovery.updated_at) : "never ran"}
-          detail={lastDiscovery ? summarizeDiscovery(lastDiscovery.value) : "Vercel Cron at 21:00 UTC (midnight Asia/Jerusalem)"}
+          detail={lastDiscovery ? summarizeDiscovery(lastDiscovery.value) : "Vercel Cron at 22:00 UTC (midnight IST / 01:00 IDT)"}
         />
         <StatusCard
           label="Last daily rollup"
