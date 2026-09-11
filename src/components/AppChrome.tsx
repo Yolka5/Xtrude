@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Icon } from "./Icon";
-import { LEAGUE } from "@/lib/fixtures";
 import { useNavTitle } from "./NavTitle";
 
 type Chrome = { title: string | null; back?: { href: string; label: string } };
@@ -21,7 +20,7 @@ type Chrome = { title: string | null; back?: { href: string; label: string } };
 function chromeFor(path: string, navTitle: string | null): Chrome {
   if (path === "/") return { title: "Today" };
   if (path === "/sessions") return { title: "Sessions" };
-  if (path === "/league") return { title: LEAGUE.name };
+  if (path === "/league") return { title: "League" };
   if (path === "/profile") return { title: "Profile" };
 
   const m = path.match(/^\/sessions\/([^/]+)$/);

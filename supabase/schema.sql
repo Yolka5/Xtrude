@@ -170,3 +170,75 @@ create policy webhook_deliveries_own on webhook_deliveries
   for all to authenticated
   using (user_id = auth.uid())
   with check (user_id = auth.uid());
+
+create table if not exists leagues (
+  id          uuid primary key default gen_random_uuid(),
+  name        text not null,
+  join_code   text not null unique,
+  created_by  uuid not null references users(id) on delete cascade,
+  created_at  timestamptz not null default now()
+);
+
+create table if not exists league_members (
+  league_id  uuid not null references leagues(id) on delete cascade,
+  user_id    uuid not null references users(id) on delete cascade,
+  joined_at  timestamptz not null default now(),
+  primary key (league_id, user_id)
+);
+
+create index if not exists league_members_user_id_idx on league_members (user_id);
+
+insert into leagues (id, name, join_code, created_by)
+values (
+  'a1c4e8b2-7d3f-4a91-9e05-2c6b8f0d4a17',
+  'Xtrude',
+  'XTRUDE',
+  'e7b3c91a-4d2f-4a8e-9c15-6f8a2d4b1e70'
+)
+on conflict (id) do nothing;
+
+insert into league_members (league_id, user_id)
+values (
+  'a1c4e8b2-7d3f-4a91-9e05-2c6b8f0d4a17',
+  'e7b3c91a-4d2f-4a8e-9c15-6f8a2d4b1e70'
+)
+on conflict (league_id, user_id) do nothing;
+
+alter table leagues enable row level security;
+alter table league_members enable row level security;
+
+drop policy if exists leagues_select_member on leagues;
+create policy leagues_select_member on leagues
+  for select to authenticated
+  using (
+    exists (
+      select 1 from league_members m
+      where m.league_id = leagues.id and m.user_id = auth.uid()
+    )
+  );
+
+drop policy if exists leagues_insert_own on leagues;
+create policy leagues_insert_own on leagues
+  for insert to authenticated
+  with check (created_by = auth.uid());
+
+drop policy if exists league_members_select_same_league on league_members;
+create policy league_members_select_same_league on league_members
+  for select to authenticated
+  using (
+    exists (
+      select 1 from league_members me
+      where me.league_id = league_members.league_id
+        and me.user_id = auth.uid()
+    )
+  );
+
+drop policy if exists league_members_insert_self on league_members;
+create policy league_members_insert_self on league_members
+  for insert to authenticated
+  with check (user_id = auth.uid());
+
+drop policy if exists league_members_delete_self on league_members;
+create policy league_members_delete_self on league_members
+  for delete to authenticated
+  using (user_id = auth.uid());

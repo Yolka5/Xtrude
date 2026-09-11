@@ -1,0 +1,172 @@
+import "server-only";
+import { getSupabase } from "./client";
+import type { League } from "@/lib/fixtures";
+import {
+  minutesInDateRange,
+  rankStandings,
+  weekWindow,
+  type StandingInput,
+} from "@/lib/leagueStandings";
+
+export type LeagueSummary = { id: string; name: string; joinCode: string };
+
+export type LeagueView = League & {
+  id: string | null;
+  joinCode: string | null;
+  allLeagues: LeagueSummary[];
+  tablesReady: boolean;
+};
+
+function isMissingTable(message: string | undefined): boolean {
+  if (!message) return false;
+  const m = message.toLowerCase();
+  return (
+    m.includes("does not exist") ||
+    m.includes("could not find the table") ||
+    m.includes("schema cache")
+  );
+}
+
+async function sessionsForUsers(userIds: string[]) {
+  if (userIds.length === 0) return [];
+  const { data, error } = await getSupabase()
+    .from("sessions")
+    .select("user_id, started_at, scored_minutes")
+    .in("user_id", userIds);
+  if (error) throw new Error(`loading league sessions: ${error.message}`);
+  return (data ?? []) as { user_id: string; started_at: string; scored_minutes: number }[];
+}
+
+function standingsFromRows(
+  people: { id: string; display_name: string; initials: string }[],
+  sessionRows: { user_id: string; started_at: string; scored_minutes: number }[],
+  meId: string,
+  weekStart: string,
+  today: string,
+  lastWeekStart: string,
+  lastWeekEnd: string
+) {
+  const byUser = new Map<string, { started_at: string; scored_minutes: number }[]>();
+  for (const row of sessionRows) {
+    const list = byUser.get(row.user_id) ?? [];
+    list.push(row);
+    byUser.set(row.user_id, list);
+  }
+  const inputs: StandingInput[] = people.map((p) => {
+    const mine = byUser.get(p.id) ?? [];
+    const week = minutesInDateRange(mine, weekStart, today);
+    const last = minutesInDateRange(mine, lastWeekStart, lastWeekEnd);
+    return {
+      userId: p.id,
+      name: p.display_name,
+      initials: p.initials,
+      weekMinutes: week.minutes,
+      weekSessions: week.sessions,
+      lastWeekMinutes: last.minutes,
+    };
+  });
+  return rankStandings(inputs, meId);
+}
+
+async function soloFromUser(userId: string): Promise<LeagueView> {
+  const { today, weekStart, lastWeekStart, lastWeekEnd, daysElapsed } = weekWindow(Date.now());
+  const [{ data: user }, sessionRows] = await Promise.all([
+    getSupabase().from("users").select("id, display_name, initials").eq("id", userId).maybeSingle(),
+    sessionsForUsers([userId]),
+  ]);
+  const person = {
+    id: userId,
+    display_name: (user?.display_name as string | undefined) ?? "You",
+    initials: (user?.initials as string | undefined) ?? "YO",
+  };
+  const members = standingsFromRows(
+    [person],
+    sessionRows,
+    userId,
+    weekStart,
+    today,
+    lastWeekStart,
+    lastWeekEnd
+  );
+  return {
+    id: null,
+    name: "Xtrude",
+    memberCount: 1,
+    daysElapsed,
+    members,
+    joinCode: null,
+    allLeagues: [],
+    tablesReady: false,
+  };
+}
+
+/**
+ * The league the current user should see. Prefers the oldest membership
+ * (the default "Xtrude" league for Yoni). If `leagues` hasn't been migrated
+ * yet, synthesizes a one-person board from real sessions so the screen
+ * stays honest instead of 500ing or falling back to fixture names.
+ */
+export async function getLeagueView(userId: string, leagueId?: string | null): Promise<LeagueView> {
+  const { today, weekStart, lastWeekStart, lastWeekEnd, daysElapsed } = weekWindow(Date.now());
+  const sb = getSupabase();
+
+  const membership = await sb
+    .from("league_members")
+    .select("league_id, joined_at, leagues(id, name, join_code)")
+    .eq("user_id", userId)
+    .order("joined_at", { ascending: true });
+
+  if (membership.error) {
+    if (isMissingTable(membership.error.message)) return soloFromUser(userId);
+    throw new Error(`loading league membership: ${membership.error.message}`);
+  }
+
+  const rows = membership.data ?? [];
+  if (rows.length === 0) return { ...(await soloFromUser(userId)), tablesReady: true };
+
+  const summaries: LeagueSummary[] = [];
+  for (const row of rows) {
+    const league = row.leagues as { id: string; name: string; join_code: string } | null;
+    if (!league) continue;
+    summaries.push({ id: league.id, name: league.name, joinCode: league.join_code });
+  }
+  if (summaries.length === 0) return { ...(await soloFromUser(userId)), tablesReady: true };
+
+  const active =
+    (leagueId && summaries.find((l) => l.id === leagueId)) || summaries[0];
+
+  const membersRes = await sb
+    .from("league_members")
+    .select("user_id, users(id, display_name, initials)")
+    .eq("league_id", active.id);
+  if (membersRes.error) throw new Error(`loading league members: ${membersRes.error.message}`);
+
+  const people: { id: string; display_name: string; initials: string }[] = [];
+  for (const row of membersRes.data ?? []) {
+    const u = row.users as { id: string; display_name: string; initials: string } | null;
+    if (u) people.push(u);
+    else people.push({ id: row.user_id as string, display_name: "Member", initials: "?" });
+  }
+
+  const sessionRows = await sessionsForUsers(people.map((p) => p.id));
+  const members = standingsFromRows(
+    people,
+    sessionRows,
+    userId,
+    weekStart,
+    today,
+    lastWeekStart,
+    lastWeekEnd
+  );
+
+  return {
+    id: active.id,
+    name: active.name,
+    memberCount: members.length,
+    daysElapsed,
+    members,
+    joinCode: active.joinCode,
+    allLeagues: summaries,
+    tablesReady: true,
+  };
+}

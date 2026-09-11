@@ -11,6 +11,7 @@
 import { deriveRealData } from "../src/lib/db/derive";
 import { clusterSessions, MIN_EVENTS, MIN_SPAN_MINUTES } from "./lib/sessionAlgorithm.mjs";
 import { calendarDateInZone, clockHmInZone } from "./lib/timezone.mjs";
+import { rankStandings } from "../src/lib/leagueStandings";
 
 const DAY = 86_400_000;
 // Fix "today" to a known Wednesday: 2026-09-09 12:00 UTC (matches the app's
@@ -253,6 +254,23 @@ check("derive: 00:30 Israel clock is 12:30 AM", edge.sessions.find((s) => s.id =
 check("derive: 23:30 Israel session.date stays 2026-09-12", edge.sessions.find((s) => s.id === "late")?.date === "2026-09-12", JSON.stringify(edge.sessions.find((s) => s.id === "late")));
 check("derive: 23:30 Israel clock is 11:30 PM", edge.sessions.find((s) => s.id === "late")?.start === "23:30", "");
 check("derive: today in Jerusalem at 10:00 IDT is 2026-09-12", edge.today === "2026-09-12", `got ${edge.today}`);
+
+const ranked = rankStandings(
+  [
+    { userId: "a", name: "Ada", initials: "A", weekMinutes: 40, weekSessions: 2, lastWeekMinutes: 10 },
+    { userId: "me", name: "Yoni", initials: "YS", weekMinutes: 11, weekSessions: 1, lastWeekMinutes: 80 },
+  ],
+  "me"
+);
+check("league: leader is Ada", ranked[0].id === "a" && ranked[0].rank === 1, JSON.stringify(ranked[0]));
+check("league: me is rank 2 from last week's 1 (movement -1)", ranked[1].rank === 2 && ranked[1].lastRank === 1 && ranked[1].movement === -1 && ranked[1].isMe, JSON.stringify(ranked[1]));
+check("league: scored minutes are real inputs, not fixtures", ranked[1].scoredMinutes === 11 && ranked[1].sessions === 1, JSON.stringify(ranked[1]));
+
+const solo = rankStandings(
+  [{ userId: "me", name: "Yoni", initials: "YS", weekMinutes: 47, weekSessions: 2, lastWeekMinutes: 47 }],
+  "me"
+);
+check("league: a league of one ranks first, isMe, holding", solo.length === 1 && solo[0].rank === 1 && solo[0].isMe && solo[0].movement === 0 && solo[0].scoredMinutes === 47, JSON.stringify(solo[0]));
 
 console.log(failures ? `\n${failures} check(s) FAILED` : "\nAll checks pass.");
 process.exit(failures ? 1 : 0);

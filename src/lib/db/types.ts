@@ -51,3 +51,17 @@ export interface DailyStatRow {
   total_scored_minutes: number;
   session_count: number;
 }
+
+export interface LeagueRow {
+  id: string;
+  name: string;
+  join_code: string;
+  created_by: string;
+  created_at: string;
+}
+
+export interface LeagueMemberRow {
+  league_id: string;
+  user_id: string;
+  joined_at: string;
+}
