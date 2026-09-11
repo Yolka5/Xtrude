@@ -65,3 +65,11 @@ export interface LeagueMemberRow {
   user_id: string;
   joined_at: string;
 }
+
+export interface OAuthTokenRow {
+  user_id: string;
+  access_cipher: string;
+  refresh_cipher: string;
+  expires_at: string;
+  updated_at: string;
+}

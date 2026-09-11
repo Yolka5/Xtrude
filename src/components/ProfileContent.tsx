@@ -194,6 +194,9 @@ export function ProfileContent({
             ? `${daysTracked} days tracked · ${duration(profile.lifetimeMinutes)} scored`
             : "Day one · nothing modeled yet"}
         </p>
+        <p className="t-caption dimmer" style={{ margin: "12px 4px 0", textAlign: "center" }}>
+          <a href="/api/auth/logout" className="t-caption" style={{ color: "inherit" }}>Sign out</a>
+        </p>
       </FlyItem>
     </main>
   );

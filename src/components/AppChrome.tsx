@@ -22,6 +22,7 @@ function chromeFor(path: string, navTitle: string | null): Chrome {
   if (path === "/sessions") return { title: "Sessions" };
   if (path === "/league") return { title: "League" };
   if (path === "/profile") return { title: "Profile" };
+  if (path === "/connect") return { title: "Xtrude" };
 
   const m = path.match(/^\/sessions\/([^/]+)$/);
   if (m) {

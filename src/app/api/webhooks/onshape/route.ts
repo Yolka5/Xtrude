@@ -33,6 +33,7 @@ const RATE_LIMIT_WINDOW_SECONDS = 10;
 const RATE_LIMIT_MAX = 40;
 
 async function logDelivery(params: {
+  userId?: string | null;
   webhookId: string | null;
   event: string | null;
   documentId: string | null;
@@ -42,7 +43,7 @@ async function logDelivery(params: {
   ip: string | null;
 }) {
   const { error } = await getSupabase().from("webhook_deliveries").insert({
-    user_id: APP_USER_ID,
+    user_id: params.userId || APP_USER_ID,
     onshape_webhook_id: params.webhookId,
     event: params.event,
     document_id: params.documentId,
@@ -82,7 +83,6 @@ export async function POST(req: NextRequest) {
   const { count: recentCount, error: countErr } = await getSupabase()
     .from("webhook_deliveries")
     .select("*", { count: "exact", head: true })
-    .eq("user_id", APP_USER_ID)
     .gte("received_at", since);
   if (!countErr && (recentCount ?? 0) >= RATE_LIMIT_MAX) {
     await logDelivery({ webhookId, event, documentId: null, accepted: false, reason: "rate_limited", raw: payload, ip });
@@ -98,7 +98,6 @@ export async function POST(req: NextRequest) {
     .from("webhook_registrations")
     .select("id, document_id, events, active, user_id")
     .eq("onshape_webhook_id", webhookId)
-    .eq("user_id", APP_USER_ID)
     .eq("active", true)
     .maybeSingle();
 
@@ -121,6 +120,7 @@ export async function POST(req: NextRequest) {
     // the endpoint is reachable and the registration is alive, not a model
     // change. Accepted and logged, no further action.
     await logDelivery({
+      userId: registration.user_id,
       webhookId,
       event,
       documentId: registration.document_id,
@@ -136,6 +136,7 @@ export async function POST(req: NextRequest) {
     // Defense in depth: Onshape should only ever send us event types we
     // registered for on this webhookId, but don't trust that blindly either.
     await logDelivery({
+      userId: registration.user_id,
       webhookId,
       event,
       documentId: registration.document_id,
@@ -157,6 +158,7 @@ export async function POST(req: NextRequest) {
   if (touchErr) console.error("tracked_documents touch failed:", touchErr.message);
 
   await logDelivery({
+    userId: registration.user_id,
     webhookId,
     event,
     documentId: registration.document_id,

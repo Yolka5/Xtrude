@@ -1,5 +1,5 @@
 import { getSupabase } from "@/lib/db/client";
-import { APP_USER_ID } from "../../../scripts/lib/appUser.mjs";
+import { getCurrentUserId } from "@/lib/auth/currentUser";
 
 export const dynamic = "force-dynamic";
 
@@ -35,11 +35,12 @@ function timeAgo(iso: string): string {
 
 export default async function AdminPage() {
   const supabase = getSupabase();
+  const userId = await getCurrentUserId();
 
   const { data: deliveries, error: deliveriesErr } = await supabase
     .from("webhook_deliveries")
     .select("id, received_at, onshape_webhook_id, event, accepted, reason, ip, tracked_documents(name)")
-    .eq("user_id", APP_USER_ID)
+    .eq("user_id", userId)
     .order("received_at", { ascending: false })
     .limit(50);
 

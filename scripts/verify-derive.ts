@@ -12,6 +12,8 @@ import { deriveRealData } from "../src/lib/db/derive";
 import { clusterSessions, MIN_EVENTS, MIN_SPAN_MINUTES } from "./lib/sessionAlgorithm.mjs";
 import { calendarDateInZone, clockHmInZone } from "./lib/timezone.mjs";
 import { rankStandings } from "../src/lib/leagueStandings";
+import { decryptSecret, encryptSecret } from "../src/lib/auth/tokenCrypto";
+import { createSessionToken, readSessionUserId } from "../src/lib/auth/session";
 
 const DAY = 86_400_000;
 // Fix "today" to a known Wednesday: 2026-09-09 12:00 UTC (matches the app's
@@ -272,6 +274,29 @@ const solo = rankStandings(
 );
 check("league: a league of one ranks first, isMe, holding", solo.length === 1 && solo[0].rank === 1 && solo[0].isMe && solo[0].movement === 0 && solo[0].scoredMinutes === 47, JSON.stringify(solo[0]));
 
-console.log(failures ? `\n${failures} check(s) FAILED` : "\nAll checks pass.");
-process.exit(failures ? 1 : 0);
+{
+  const secret = "x".repeat(32);
+  const cipher = encryptSecret("onshape-access-token", secret);
+  check("oauth token encrypt roundtrip", decryptSecret(cipher, secret) === "onshape-access-token", "");
+  let threw = false;
+  try {
+    decryptSecret(cipher, "y".repeat(32));
+  } catch {
+    threw = true;
+  }
+  check("oauth token encrypt rejects the wrong key", threw, "");
+}
+
+void (async () => {
+  const secret = "x".repeat(32);
+  const uid = "e7b3c91a-4d2f-4a8e-9c15-6f8a2d4b1e70";
+  const tok = await createSessionToken(uid, secret);
+  check("session cookie roundtrip", (await readSessionUserId(tok, secret)) === uid, "");
+  check("session cookie rejects a missing secret", (await readSessionUserId(tok, undefined)) === null, "");
+  const tampered = tok.slice(0, -3) + "aaa";
+  check("session cookie rejects tampering", (await readSessionUserId(tampered, secret)) === null, "");
+
+  console.log(failures ? `\n${failures} check(s) FAILED` : "\nAll checks pass.");
+  process.exit(failures ? 1 : 0);
+})();
 

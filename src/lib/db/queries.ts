@@ -2,7 +2,7 @@ import "server-only";
 import { getSupabase } from "./client";
 import { deriveRealData, type RealData } from "./derive";
 import type { TouchedDocument } from "@/lib/fixtures";
-import { APP_USER_ID } from "../../../scripts/lib/appUser.mjs";
+import { getCurrentUserId } from "@/lib/auth/currentUser";
 
 export type { RealData };
 
@@ -15,11 +15,12 @@ export type { RealData };
  */
 export async function getRealData(): Promise<RealData> {
   const todayMs = Date.now();
+  const userId = await getCurrentUserId();
 
   const [sessionsRes, dailyRes, docsRes] = await Promise.all([
-    getSupabase().from("sessions").select("*").eq("user_id", APP_USER_ID).order("started_at", { ascending: false }),
-    getSupabase().from("daily_stats").select("*").eq("user_id", APP_USER_ID).order("date", { ascending: true }),
-    getSupabase().from("tracked_documents").select("id, onshape_document_id, name").eq("user_id", APP_USER_ID),
+    getSupabase().from("sessions").select("*").eq("user_id", userId).order("started_at", { ascending: false }),
+    getSupabase().from("daily_stats").select("*").eq("user_id", userId).order("date", { ascending: true }),
+    getSupabase().from("tracked_documents").select("id, onshape_document_id, name").eq("user_id", userId),
   ]);
   if (sessionsRes.error) throw new Error(`loading sessions: ${sessionsRes.error.message}`);
   if (dailyRes.error) throw new Error(`loading daily_stats: ${dailyRes.error.message}`);
@@ -59,10 +60,11 @@ export async function getLastSyncAt(): Promise<number | null> {
  * midnight). Falls back to `fallback` (edits: 0 placeholders) on any error
  * so a lookup failure degrades to "no breakdown," never a broken page. */
 export async function getSessionDocuments(sessionId: string, fallback: TouchedDocument[]): Promise<TouchedDocument[]> {
+  const userId = await getCurrentUserId();
   const { data: sessionRow, error: sessionErr } = await getSupabase()
     .from("sessions")
     .select("started_at, ended_at")
-    .eq("user_id", APP_USER_ID)
+    .eq("user_id", userId)
     .eq("id", sessionId)
     .single();
   if (sessionErr || !sessionRow) return fallback;
@@ -70,7 +72,7 @@ export async function getSessionDocuments(sessionId: string, fallback: TouchedDo
   const { data, error } = await getSupabase()
     .from("events")
     .select("occurred_at, tracked_documents(name)")
-    .eq("user_id", APP_USER_ID)
+    .eq("user_id", userId)
     .gte("occurred_at", sessionRow.started_at)
     .lte("occurred_at", sessionRow.ended_at)
     .order("occurred_at", { ascending: true });

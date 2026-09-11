@@ -242,3 +242,13 @@ drop policy if exists league_members_delete_self on league_members;
 create policy league_members_delete_self on league_members
   for delete to authenticated
   using (user_id = auth.uid());
+
+create table if not exists oauth_tokens (
+  user_id          uuid primary key references users(id) on delete cascade,
+  access_cipher    text not null,
+  refresh_cipher   text not null,
+  expires_at       timestamptz not null,
+  updated_at       timestamptz not null default now()
+);
+
+alter table oauth_tokens enable row level security;
