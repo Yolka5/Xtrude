@@ -41,8 +41,10 @@ async function fetchAllEvents(supabase, userId) {
 /**
  * @param {*} supabase
  * @param {{ excludeLiveTail?: boolean, now?: Date, userId?: string }} [opts]
+ * @returns {Promise<{ sessionsWritten: number, activeDays: number, dropped: number, excludedLiveTail: boolean }>}
  */
-export async function rebuildSessions(supabase, { excludeLiveTail = false, now = new Date(), userId = APP_USER_ID } = {}) {
+export async function rebuildSessions(supabase, opts = {}) {
+  const { excludeLiveTail = false, now = new Date(), userId = APP_USER_ID } = opts;
   const events = await fetchAllEvents(supabase, userId);
 
   let clusters = events.length ? clusterSessions(events) : [];

@@ -16,24 +16,29 @@ export async function enablePush(): Promise<string | null> {
   if (!("Notification" in window) || !("serviceWorker" in navigator) || !("PushManager" in window)) {
     return "Push is not available in this browser.";
   }
-  const perm = await Notification.requestPermission();
-  if (perm !== "granted") return "Permission was not granted.";
-  const vapid = await fetch("/api/push/vapid/");
-  if (!vapid.ok) return "Push is not configured on the server yet.";
-  const { publicKey } = (await vapid.json()) as { publicKey: string };
-  const reg = await navigator.serviceWorker.ready;
-  const sub = await reg.pushManager.subscribe({
-    userVisibleOnly: true,
-    applicationServerKey: urlBase64ToUint8Array(publicKey),
-  });
-  const json = sub.toJSON();
-  const res = await fetch("/api/push/subscribe/", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ endpoint: json.endpoint, keys: json.keys }),
-  });
-  if (!res.ok) return "Could not save the subscription.";
-  return null;
+  try {
+    const perm = await Notification.requestPermission();
+    if (perm !== "granted") return "Permission was not granted.";
+    const vapid = await fetch("/api/push/vapid/");
+    if (!vapid.ok) return "Push is not available right now.";
+    const { publicKey } = (await vapid.json()) as { publicKey?: string };
+    if (!publicKey) return "Push is not available right now.";
+    const reg = await navigator.serviceWorker.ready;
+    const sub = await reg.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(publicKey),
+    });
+    const json = sub.toJSON();
+    const res = await fetch("/api/push/subscribe/", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ endpoint: json.endpoint, keys: json.keys }),
+    });
+    if (!res.ok) return "Could not save the subscription.";
+    return null;
+  } catch {
+    return "Push is not available right now.";
+  }
 }
 
 /** Quiet banner after the person already has a streak — never on first load. */
@@ -46,7 +51,13 @@ export function PushPrompt({ ready }: { ready: boolean }) {
     if (window.localStorage.getItem(DISMISS_KEY)) return;
     if (!("Notification" in window) || Notification.permission !== "default") return;
     if (!("serviceWorker" in navigator)) return;
-    const t = window.setTimeout(() => setVisible(true), 4000);
+    const t = window.setTimeout(() => {
+      void fetch("/api/push/vapid/")
+        .then((r) => {
+          if (r.ok) setVisible(true);
+        })
+        .catch(() => {});
+    }, 4000);
     return () => window.clearTimeout(t);
   }, [ready]);
 

@@ -18,6 +18,7 @@ import { proxy, isPublicPath } from "../src/proxy";
 import { NextRequest } from "next/server";
 import { discoveryDue, whoIsDue } from "../src/lib/discoverySchedule";
 import { applyOnshapeLogin, canRebindOnshapeId, sessionsFor, type UserDataStore } from "../src/lib/auth/bindUser";
+import { clientPushConfig, pushIsConfigured } from "../src/lib/push/config";
 
 const DAY = 86_400_000;
 // Fix "today" to a known Wednesday: 2026-09-09 12:00 UTC (matches the app's
@@ -146,6 +147,11 @@ check(
   JSON.stringify(empty.badges.filter((b) => b.earned).map((b) => b.id))
 );
 check("no records without data", empty.records.length === 0, JSON.stringify(empty.records));
+check(
+  "no streak without data",
+  empty.streak.current === 0 && empty.streak.longest === 0,
+  JSON.stringify(empty.streak)
+);
 check(
   "documents resolve to real names",
   result.sessions.every((s) => s.documents.every((d) => d.name !== "Unknown document")),
@@ -532,6 +538,22 @@ check(
     threw = true;
   }
   check("oauth token encrypt rejects the wrong key", threw, "");
+}
+
+{
+  const env = {
+    PUSH_VAPID_PUBLIC_KEY: "pub-key-value",
+    PUSH_VAPID_PRIVATE_KEY: "SUPER_SECRET_PRIVATE_KEY",
+  };
+  const payload = clientPushConfig(env);
+  check("client push config exposes the public key", payload.publicKey === "pub-key-value", JSON.stringify(payload));
+  check(
+    "client push config never includes the private key",
+    !JSON.stringify(payload).includes("SUPER_SECRET_PRIVATE_KEY") && !Object.values(payload).includes("SUPER_SECRET_PRIVATE_KEY"),
+    JSON.stringify(payload)
+  );
+  check("push is unavailable without keys", pushIsConfigured({}) === false && pushIsConfigured({ PUSH_VAPID_PUBLIC_KEY: "only-pub" }) === false, "");
+  check("push is available when both VAPID keys exist", pushIsConfigured(env) === true, "");
 }
 
 void (async () => {

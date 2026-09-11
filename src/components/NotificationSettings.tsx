@@ -7,6 +7,7 @@ export function NotificationSettings() {
   const [streak, setStreak] = useState(true);
   const [league, setLeague] = useState(true);
   const [status, setStatus] = useState<string | null>(null);
+  const [available, setAvailable] = useState<boolean | null>(null);
 
   useEffect(() => {
     void fetch("/api/push/prefs/")
@@ -16,6 +17,9 @@ export function NotificationSettings() {
         if (typeof j.league === "boolean") setLeague(j.league);
       })
       .catch(() => {});
+    void fetch("/api/push/vapid/")
+      .then((r) => setAvailable(r.ok))
+      .catch(() => setAvailable(false));
   }, []);
 
   async function save(next: { streak?: boolean; league?: boolean }) {
@@ -58,7 +62,31 @@ export function NotificationSettings() {
       >
         Enable push on this device
       </button>
-      {status ? <p className="t-caption dimmer" style={{ margin: "8px 0 0" }}>{status}</p> : null}
+      <button
+        type="button"
+        className="text-btn"
+        style={{ paddingLeft: 0 }}
+        onClick={async () => {
+          try {
+            const res = await fetch("/api/push/test/", { method: "POST" });
+            const json = (await res.json()) as { sent?: number; unavailable?: boolean };
+            if (json.unavailable) setStatus("Push is unavailable on the server.");
+            else if ((json.sent ?? 0) > 0) setStatus("Test sent — check the notification.");
+            else setStatus("No subscription on this device yet. Enable push first.");
+          } catch {
+            setStatus("Push is unavailable right now.");
+          }
+        }}
+      >
+        Send a test notification
+      </button>
+      {available === false ? (
+        <p className="t-caption dimmer" style={{ margin: "8px 0 0" }}>
+          Push is unavailable on this server. Today still works.
+        </p>
+      ) : status ? (
+        <p className="t-caption dimmer" style={{ margin: "8px 0 0" }}>{status}</p>
+      ) : null}
     </section>
   );
 }

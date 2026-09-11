@@ -1,7 +1,6 @@
 import "server-only";
-import { makeClient } from "../../scripts/lib/onshape.mjs";
+import { makeClient, rebuildSessions } from "@/lib/onshapeRuntime";
 import { ingestDocumentHistory } from "../../scripts/lib/ingestDocument.mjs";
-import { rebuildSessions } from "../../scripts/lib/sessionRebuild.mjs";
 import { getSupabase } from "@/lib/db/client";
 import { getValidAccessToken } from "@/lib/auth/tokens";
 import { requireEnv } from "@/lib/env";

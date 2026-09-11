@@ -13,6 +13,13 @@
 
 const BASE_URL = "https://cad.onshape.com/api";
 
+/**
+ * @param {object} opts
+ * @param {string} [opts.accessKey]
+ * @param {string} [opts.secretKey]
+ * @param {string} [opts.accessToken]
+ * @param {number} opts.maxCalls
+ */
 export function makeClient({ accessKey, secretKey, accessToken, maxCalls }) {
   const headers = {
     Authorization: accessToken

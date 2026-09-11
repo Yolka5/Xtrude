@@ -129,7 +129,7 @@ export async function getLeagueView(userId: string, leagueId?: string | null): P
 
   const summaries: LeagueSummary[] = [];
   for (const row of rows) {
-    const league = row.leagues as { id: string; name: string; join_code: string; created_by: string } | null;
+    const league = row.leagues as unknown as { id: string; name: string; join_code: string; created_by: string } | null;
     if (!league) continue;
     summaries.push({ id: league.id, name: league.name, joinCode: league.join_code });
   }
@@ -138,7 +138,7 @@ export async function getLeagueView(userId: string, leagueId?: string | null): P
   const active =
     (leagueId && summaries.find((l) => l.id === leagueId)) || summaries[0];
   const activeRow = rows.find((row) => {
-    const league = row.leagues as { id: string } | null;
+    const league = row.leagues as unknown as { id: string } | null;
     return league?.id === active.id;
   });
   const createdBy = (activeRow?.leagues as { created_by?: string } | null)?.created_by;
@@ -151,7 +151,7 @@ export async function getLeagueView(userId: string, leagueId?: string | null): P
 
   const people: { id: string; display_name: string; initials: string }[] = [];
   for (const row of membersRes.data ?? []) {
-    const u = row.users as { id: string; display_name: string; initials: string } | null;
+    const u = row.users as unknown as { id: string; display_name: string; initials: string } | null;
     if (u) people.push(u);
     else people.push({ id: row.user_id as string, display_name: "Member", initials: "?" });
   }

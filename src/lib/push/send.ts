@@ -1,6 +1,7 @@
 import "server-only";
 import webpush from "web-push";
 import { getSupabase } from "@/lib/db/client";
+import { clientPushConfig, pushIsConfigured } from "./config";
 
 export type PushPayload = {
   title: string;
@@ -10,15 +11,19 @@ export type PushPayload = {
 };
 
 function vapidConfigured(): boolean {
-  const pub = process.env.PUSH_VAPID_PUBLIC_KEY;
-  const priv = process.env.PUSH_VAPID_PRIVATE_KEY;
-  if (!pub || !priv) return false;
-  webpush.setVapidDetails(process.env.PUSH_VAPID_SUBJECT || "mailto:xtrude@localhost", pub, priv);
-  return true;
+  if (!pushIsConfigured()) return false;
+  try {
+    const pub = process.env.PUSH_VAPID_PUBLIC_KEY!;
+    const priv = process.env.PUSH_VAPID_PRIVATE_KEY!;
+    webpush.setVapidDetails(process.env.PUSH_VAPID_SUBJECT || "mailto:xtrude@localhost", pub, priv);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export function vapidPublicKey(): string | null {
-  return process.env.PUSH_VAPID_PUBLIC_KEY || null;
+  return clientPushConfig().publicKey;
 }
 
 export async function sendPushToUser(userId: string, payload: PushPayload): Promise<{ sent: number; gone: number }> {

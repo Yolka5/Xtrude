@@ -1,8 +1,7 @@
 import "server-only";
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { makeClient } from "../../../../../scripts/lib/onshape.mjs";
-import { rebuildSessions } from "../../../../../scripts/lib/sessionRebuild.mjs";
+import { makeClient, rebuildSessions } from "@/lib/onshapeRuntime";
 import { snapshotStreak } from "../../../../../scripts/lib/streakSnapshot.mjs";
 import { requireEnv } from "@/lib/env";
 import { cronAuthorized, unauthorizedCron } from "@/lib/cronAuth";
