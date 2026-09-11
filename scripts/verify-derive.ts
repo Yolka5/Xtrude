@@ -10,7 +10,7 @@
  */
 import { deriveRealData } from "../src/lib/db/derive";
 import { clusterSessions, MIN_EVENTS, MIN_SPAN_MINUTES } from "./lib/sessionAlgorithm.mjs";
-import { calendarDateInZone, clockHmInZone } from "./lib/timezone.mjs";
+import { calendarDateInZone, clockHmInZone, isAfterMidnightWindow } from "./lib/timezone.mjs";
 import { rankStandings, generateJoinCode, JOIN_CODE_ALPHABET, JOIN_CODE_LENGTH, joinCodeIsUnambiguous, allocateJoinCode, renameLeagueState, regenerateLeagueCode } from "../src/lib/leagueStandings";
 import { decryptSecret, encryptSecret } from "../src/lib/auth/tokenCrypto";
 import { createSessionToken, readSessionUserId } from "../src/lib/auth/session";
@@ -276,6 +276,38 @@ check(
   edge.badges.find((b) => b.id === "midnight")?.earned === true,
   JSON.stringify(edge.badges.find((b) => b.id === "midnight"))
 );
+
+function midnightSession(id: string, startedAt: string): Parameters<typeof deriveRealData>[0][number] {
+  return {
+    id,
+    started_at: startedAt,
+    ended_at: new Date(Date.parse(startedAt) + 20 * 60_000).toISOString(),
+    raw_minutes: 20,
+    scored_minutes: 25,
+    event_count: 4,
+    document_ids: ["doc1"],
+  };
+}
+function midnightBadge(startedAt: string, todayMs: number) {
+  return deriveRealData(
+    [midnightSession("m", startedAt)],
+    [{ date: calendarDateInZone(startedAt), total_scored_minutes: 25, session_count: 1 }],
+    docNameById,
+    todayMs
+  ).badges.find((b) => b.id === "midnight")?.earned;
+}
+
+{
+  const idtToday = Date.parse("2026-09-12T07:00:00.000Z");
+  const istToday = Date.parse("2026-01-15T10:00:00.000Z");
+  check("04:59 IDT counts for After Midnight", midnightBadge("2026-09-12T01:59:00.000Z", idtToday) === true, "");
+  check("05:00 IDT does not count for After Midnight", midnightBadge("2026-09-12T02:00:00.000Z", idtToday) === false, "");
+  check("04:59 IST (winter) counts for After Midnight", midnightBadge("2026-01-15T02:59:00.000Z", istToday) === true, "");
+  check("05:00 IST (winter) does not count for After Midnight", midnightBadge("2026-01-15T03:00:00.000Z", istToday) === false, "");
+  check("UTC 02:30 in September is 05:30 IDT and does not count", midnightBadge("2026-09-12T02:30:00.000Z", idtToday) === false, `window=${isAfterMidnightWindow("2026-09-12T02:30:00.000Z")} clock=${clockHmInZone("2026-09-12T02:30:00.000Z")}`);
+  check("04:59 IDT is 01:59 UTC not 04:59 UTC", clockHmInZone("2026-09-12T01:59:00.000Z") === "04:59" && isAfterMidnightWindow("2026-09-12T01:59:00.000Z") === true, clockHmInZone("2026-09-12T01:59:00.000Z"));
+  check("04:59 IST is 02:59 UTC not 04:59 UTC", clockHmInZone("2026-01-15T02:59:00.000Z") === "04:59" && isAfterMidnightWindow("2026-01-15T02:59:00.000Z") === true, clockHmInZone("2026-01-15T02:59:00.000Z"));
+}
 
 const ranked = rankStandings(
   [

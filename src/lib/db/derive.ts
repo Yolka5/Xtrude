@@ -28,7 +28,7 @@ import type {
   PersonalRecord,
   Badge,
 } from "@/lib/fixtures";
-import { calendarDateInZone, clockHmInZone } from "../../../scripts/lib/timezone.mjs";
+import { calendarDateInZone, clockHmInZone, isAfterMidnightWindow } from "../../../scripts/lib/timezone.mjs";
 import { computeStreakAndFreezes, QUALIFYING_MINUTES } from "../../../scripts/lib/streakMath.mjs";
 
 const DAY_MS = 86_400_000;
@@ -234,10 +234,7 @@ export function deriveRealData(
     );
   }
 
-  const afterMidnight = sessions.some((s) => {
-    const hour = Number(s.start.slice(0, 2));
-    return Number.isFinite(hour) && hour < 5;
-  });
+  const afterMidnight = sessionRows.some((row) => isAfterMidnightWindow(row.started_at));
   let fullWeek = false;
   for (let i = 0; i + 7 <= daily.length; i++) {
     if (mondayIndexedDowFromDate(daily[i]!.date) !== 0) continue;

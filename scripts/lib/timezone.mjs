@@ -60,3 +60,16 @@ export function clockHmInZone(instant, timeZone = APP_TIMEZONE) {
   const p = zonedParts(instant, timeZone);
   return `${p.hour}:${p.minute}`;
 }
+
+/**
+ * After Midnight badge window: 00:00–04:59 inclusive in `timeZone`.
+ * 05:00 does not count. Uses the instant's local clock, not UTC.
+ *
+ * @param {string | number | Date} instant
+ * @param {string} [timeZone]
+ */
+export function isAfterMidnightWindow(instant, timeZone = APP_TIMEZONE) {
+  const p = zonedParts(instant, timeZone);
+  const hour = Number(p.hour);
+  return Number.isFinite(hour) && hour >= 0 && hour < 5;
+}
