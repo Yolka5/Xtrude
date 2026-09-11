@@ -95,6 +95,9 @@ export function ProfileContent({
   daily,
   daysTracked,
   hasAnyData,
+  displayName,
+  memberSince,
+  imageUrl,
 }: {
   profile: ProfileStats;
   records: PersonalRecord[];
@@ -102,6 +105,9 @@ export function ProfileContent({
   daily: DayTotal[];
   daysTracked: number;
   hasAnyData: boolean;
+  displayName: string;
+  memberSince: string;
+  imageUrl: string | null;
 }) {
   const earned = badges.filter((b) => b.earned).length;
 
@@ -122,7 +128,12 @@ export function ProfileContent({
       {/* Identity - intentionally minimal so it doesn't compete with the hero */}
       <FlyItem>
         <h1 className="screen__title">Profile</h1>
-        <ProfileIdentity handle={profile.handle} memberSince={profile.memberSince} />
+        <ProfileIdentity
+          displayName={displayName}
+          handle={profile.handle}
+          memberSince={memberSince}
+          imageUrl={imageUrl}
+        />
       </FlyItem>
 
       {/* Hero: the all-time heatmap. Profile has no colour of its own, so

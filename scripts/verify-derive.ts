@@ -28,8 +28,10 @@ import {
 } from "../src/lib/push/triggers";
 import { connectPathWithInvite, inviteCodeFromNext, invitePath, oauthStartPath, planJoinLanding, safeNextPath } from "../src/lib/invite";
 import { firstRunCopy } from "../src/lib/firstRun";
-import { connectPathWithInvite, inviteCodeFromNext, invitePath, planJoinLanding, safeNextPath } from "../src/lib/invite";
-import { firstRunCopy } from "../src/lib/firstRun";
+import { withOAuthAccess } from "../src/lib/auth/oauthAccess";
+import { DEFAULT_MAX_CALLS_PER_RUN, simulateCappedRun } from "./lib/callBudget.mjs";
+import { assembleSessionDocuments, countDocumentsFromEvents, sessionQualification } from "../src/lib/sessionDetail";
+import { memberSinceLabel, profileImageUrlFromSession, sanitizeDisplayName } from "../src/lib/profileFields";
 
 const DAY = 86_400_000;
 // Fix "today" to a known Wednesday: 2026-09-09 12:00 UTC (matches the app's
@@ -748,7 +750,152 @@ check(
   );
 }
 
+{
+  const counted = countDocumentsFromEvents([
+    { documentName: "Bearing Block" },
+    { documentName: "Bearing Block" },
+    { documentName: "Rover Chassis" },
+    { documentName: "  " },
+    { documentName: null },
+  ]);
+  check(
+    "session docs count real events, skip nameless rows, and never invent a 0",
+    counted.length === 2 &&
+      counted.find((d) => d.name === "Bearing Block")?.edits === 2 &&
+      counted.find((d) => d.name === "Rover Chassis")?.edits === 1 &&
+      counted.every((d) => d.edits != null && d.edits > 0),
+    JSON.stringify(counted)
+  );
+  const namedOnly = assembleSessionDocuments({
+    eventNames: [],
+    documentIds: ["doc1", "doc2"],
+    nameByOnshapeId: new Map([["doc1", "Bearing Block"]]),
+  });
+  check(
+    "session docs without events list names with unknown edits, not a fake 0",
+    namedOnly.length === 2 &&
+      namedOnly[0]?.name === "Bearing Block" &&
+      namedOnly[0]?.edits === null &&
+      namedOnly[1]?.name === "Unknown document" &&
+      namedOnly[1]?.edits === null,
+    JSON.stringify(namedOnly)
+  );
+  check("session qualifies at 2 events and 2 minutes", sessionQualification(2, 2).qualified === true, "");
+  check("session does not qualify on event count alone", sessionQualification(1, 10).qualified === false, "");
+  check("session does not qualify on span alone", sessionQualification(5, 1).qualified === false, "");
+}
+
+{
+  check(
+    "profile image is kept only when sessioninfo.image is an http(s) URL",
+    profileImageUrlFromSession({ image: "https://cad.onshape.com/user.png" }) === "https://cad.onshape.com/user.png" &&
+      profileImageUrlFromSession({ image: "http://example.com/a.png" }) === "http://example.com/a.png",
+    ""
+  );
+  check(
+    "profile image is skipped for non-URL sessioninfo.image values",
+    profileImageUrlFromSession({ image: "cid:abc" }) === null &&
+      profileImageUrlFromSession({ image: "/relative.png" }) === null &&
+      profileImageUrlFromSession({ image: "user-id" }) === null &&
+      profileImageUrlFromSession({}) === null &&
+      profileImageUrlFromSession(null) === null,
+    ""
+  );
+  check("sanitizeDisplayName trims and collapses spaces", sanitizeDisplayName("  Yoni   S  ") === "Yoni S", sanitizeDisplayName("  Yoni   S  "));
+  check("sanitizeDisplayName rejects blank as empty when fallback is empty", sanitizeDisplayName("   ", "") === "", "");
+  check("member since is month + year from created_at", memberSinceLabel("2026-03-15T12:00:00.000Z") === "March 2026", String(memberSinceLabel("2026-03-15T12:00:00.000Z")));
+}
+
+{
+  const run = simulateCappedRun({ maxCalls: 100, plannedCalls: 150 });
+  check("call cap default is 100", DEFAULT_MAX_CALLS_PER_RUN === 100, String(DEFAULT_MAX_CALLS_PER_RUN));
+  check(
+    "a 150-call run stops at 100 and logs where it stopped",
+    run.completed === 100 &&
+      run.callsUsed === 100 &&
+      run.remaining === 50 &&
+      run.log != null &&
+      run.log.hit === true &&
+      run.log.maxCalls === 100 &&
+      typeof run.log.stoppedAt === "string" &&
+      run.log.stoppedAt.length > 0,
+    JSON.stringify(run)
+  );
+}
+
 void (async () => {
+  const now = 1_700_000_000_000;
+  const expired = await withOAuthAccess({
+    needsReauth: false,
+    expiresAtMs: now,
+    nowMs: now,
+    getAccessToken: () => "stale",
+    refresh: async () => ({ accessToken: "fresh" }),
+    request: async (token) => {
+      if (token !== "fresh") throw new Error("original request used the expired token");
+      return `ok:${token}`;
+    },
+  });
+  check(
+    "expired OAuth token refreshes once then runs the original request",
+    expired.status === "ok" && expired.refreshCalls === 1 && expired.requestCalls === 1 && expired.value === "ok:fresh",
+    JSON.stringify(expired)
+  );
+
+  const failedRefresh = await withOAuthAccess({
+    needsReauth: false,
+    expiresAtMs: now,
+    nowMs: now,
+    getAccessToken: () => "stale",
+    refresh: async () => {
+      throw new Error("refresh HTTP 400");
+    },
+    request: async () => {
+      throw new Error("Onshape should not be called after a failed refresh");
+    },
+  });
+  check(
+    "failed refresh marks needs-reauth and makes zero Onshape requests",
+    failedRefresh.status === "needs_reauth" && failedRefresh.refreshCalls === 1 && failedRefresh.requestCalls === 0,
+    JSON.stringify(failedRefresh)
+  );
+
+  const blocked = await withOAuthAccess({
+    needsReauth: true,
+    expiresAtMs: now + 3_600_000,
+    nowMs: now,
+    getAccessToken: () => "stale",
+    refresh: async () => ({ accessToken: "fresh" }),
+    request: async () => {
+      throw new Error("Onshape should not be called while needs-reauth");
+    },
+  });
+  check(
+    "needs-reauth blocks further Onshape calls until reconnect",
+    blocked.status === "blocked" && blocked.refreshCalls === 0 && blocked.requestCalls === 0,
+    JSON.stringify(blocked)
+  );
+
+  const unauthorizedThenRetry = await withOAuthAccess({
+    needsReauth: false,
+    expiresAtMs: now + 3_600_000,
+    nowMs: now,
+    getAccessToken: () => "stale",
+    refresh: async () => ({ accessToken: "fresh" }),
+    request: async (token) => {
+      if (token === "stale") throw new Error("HTTP 401 from GET /v6/documents");
+      return "ok";
+    },
+  });
+  check(
+    "401 on a still-fresh access token refreshes once and retries the original request",
+    unauthorizedThenRetry.status === "ok" &&
+      unauthorizedThenRetry.refreshCalls === 1 &&
+      unauthorizedThenRetry.requestCalls === 2 &&
+      unauthorizedThenRetry.value === "ok",
+    JSON.stringify(unauthorizedThenRetry)
+  );
+
   const secret = "x".repeat(32);
   const uid = "e7b3c91a-4d2f-4a8e-9c15-6f8a2d4b1e70";
   const tok = await createSessionToken(uid, secret);

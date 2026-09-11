@@ -1,10 +1,13 @@
 import { ProfileContent } from "@/components/ProfileContent";
-import { getRealData } from "@/lib/db/queries";
+import { getAccountProfile, getRealData } from "@/lib/db/queries";
 
 export const dynamic = "force-dynamic";
 
 export default async function ProfileScreen() {
-  const { profile, records, badges, daily, hasAnyData } = await getRealData();
+  const [{ profile, records, badges, daily, hasAnyData }, account] = await Promise.all([
+    getRealData(),
+    getAccountProfile(),
+  ]);
   return (
     <ProfileContent
       profile={profile}
@@ -13,6 +16,9 @@ export default async function ProfileScreen() {
       daily={daily}
       daysTracked={daily.length}
       hasAnyData={hasAnyData}
+      displayName={account.displayName}
+      memberSince={account.memberSince}
+      imageUrl={account.imageUrl}
     />
   );
 }

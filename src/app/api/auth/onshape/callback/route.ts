@@ -11,11 +11,12 @@ import {
   fetchOnshapeSessionInfo,
   onshapeCallbackUrl,
 } from "@/lib/auth/onshape";
-import { storeOnshapeTokens } from "@/lib/auth/tokens";
+import { storeOnshapeTokens, storeOnshapeImage } from "@/lib/auth/tokens";
 import { upsertUserFromOnshape } from "@/lib/auth/upsertUser";
 import { maybeOnboardUser } from "@/lib/onboarding";
 import { joinLeagueByCode } from "@/lib/db/leagues";
 import { INVITE_COOKIE, invitePath, parseInviteCode } from "@/lib/invite";
+import { profileImageUrlFromSession } from "@/lib/profileFields";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -79,6 +80,7 @@ export async function GET(req: NextRequest) {
       refreshToken: tokens.refresh_token,
       expiresInSec: tokens.expires_in,
     });
+    await storeOnshapeImage(user.id, profileImageUrlFromSession(profile));
   } catch (err) {
     console.error("store tokens failed:", err instanceof Error ? err.message : err);
     return fail(req, "token_store");

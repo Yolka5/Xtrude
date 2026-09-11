@@ -66,6 +66,8 @@ export type OnshapeSessionInfo = {
   firstName?: string;
   lastName?: string;
   email?: string;
+  /** Present on BTUserBasicSummaryInfo; only use when it is an http(s) URL. */
+  image?: string;
 };
 
 /**
