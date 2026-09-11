@@ -1,6 +1,6 @@
 import "server-only";
 import { getSupabase } from "@/lib/db/client";
-import { APP_USER_ID } from "../../../scripts/lib/appUser.mjs";
+import { planOnshapeLogin, type BoundUser } from "./bindUser";
 import {
   displayNameFromSession,
   initialsFromName,
@@ -15,28 +15,15 @@ export async function upsertUserFromOnshape(info: OnshapeSessionInfo): Promise<{
   const name = displayNameFromSession(info);
   const initials = initialsFromName(name);
 
-  const { data: existing, error: existingErr } = await sb
+  const { data: rows, error: existingErr } = await sb
     .from("users")
-    .select("id")
-    .eq("onshape_user_id", onshapeId)
-    .maybeSingle();
+    .select("id, onshape_user_id");
   if (existingErr) throw new Error(`looking up user: ${existingErr.message}`);
-  if (existing?.id) return { id: existing.id as string, created: false };
 
-  // First OAuth on this project: bind the Onshape account to Yoni's existing
-  // row (sessions, documents, webhooks) instead of creating an empty twin.
-  const { data: yoni } = await sb
-    .from("users")
-    .select("id, onshape_user_id")
-    .eq("id", APP_USER_ID)
-    .maybeSingle();
-  if (yoni && !yoni.onshape_user_id) {
-    const { error: bindErr } = await sb
-      .from("users")
-      .update({ onshape_user_id: onshapeId })
-      .eq("id", APP_USER_ID);
-    if (bindErr) throw new Error(`binding onshape user: ${bindErr.message}`);
-    return { id: APP_USER_ID, created: false };
+  const users = (rows ?? []) as BoundUser[];
+  const plan = planOnshapeLogin(onshapeId, users);
+  if (plan.action === "reuse") {
+    return { id: plan.userId, created: false };
   }
 
   const { data: inserted, error: insertErr } = await sb

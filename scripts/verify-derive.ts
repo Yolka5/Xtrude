@@ -15,6 +15,7 @@ import { rankStandings, generateJoinCode } from "../src/lib/leagueStandings";
 import { decryptSecret, encryptSecret } from "../src/lib/auth/tokenCrypto";
 import { createSessionToken, readSessionUserId } from "../src/lib/auth/session";
 import { discoveryDue, whoIsDue } from "../src/lib/discoverySchedule";
+import { applyOnshapeLogin, canRebindOnshapeId, sessionsFor, type UserDataStore } from "../src/lib/auth/bindUser";
 
 const DAY = 86_400_000;
 // Fix "today" to a known Wednesday: 2026-09-09 12:00 UTC (matches the app's
@@ -400,6 +401,42 @@ check(
     discoveryDue({ now: cronNow, lastSessionAt: null, lastDiscoveredAt: null }).due === true,
     JSON.stringify(discoveryDue({ now: cronNow, lastSessionAt: null, lastDiscoveredAt: null }))
   );
+}
+
+{
+  const store: UserDataStore = {
+    users: [{ id: "user-a", onshape_user_id: "osa" }],
+    sessions: [
+      { id: "s1", user_id: "user-a" },
+      { id: "s2", user_id: "user-a" },
+      { id: "s3", user_id: "user-a" },
+    ],
+    documents: [{ id: "d1", user_id: "user-a" }],
+    streaks: [{ user_id: "user-a", current: 12 }],
+    badges: [{ user_id: "user-a", id: "first" }],
+    records: [{ user_id: "user-a", label: "Biggest day" }],
+  };
+  const b = applyOnshapeLogin(store, "osb", "user-b");
+  check("login B creates a new user", b.created === true && b.userId === "user-b", JSON.stringify(b));
+  check("login B sees zero sessions", sessionsFor(store, b.userId).length === 0, JSON.stringify({ userId: b.userId, sessions: sessionsFor(store, b.userId) }));
+  check("login B does not inherit A's sessions", sessionsFor(store, "user-a").length === 3 && b.userId !== "user-a", JSON.stringify({ b, aSessions: sessionsFor(store, "user-a") }));
+  check("login B does not inherit A's documents", store.documents.filter((d) => d.user_id === "user-b").length === 0 && store.documents.filter((d) => d.user_id === "user-a").length === 1, "");
+  check("login B does not inherit A's streak/badges/records", store.streaks.every((s) => s.user_id === "user-a") && store.badges.every((x) => x.user_id === "user-a") && store.records.every((x) => x.user_id === "user-a"), "");
+  const aAgain = applyOnshapeLogin(store, "osa", "should-not-use");
+  check("login A again reuses A", aAgain.created === false && aAgain.userId === "user-a", JSON.stringify(aAgain));
+  const aRow = store.users.find((u) => u.id === "user-a")!;
+  check("bound A cannot be rebound to B's Onshape id", canRebindOnshapeId(aRow, "osb") === false, "");
+  check("a null onshape_user_id row is not a bootstrap bind target", canRebindOnshapeId({ id: "orphan", onshape_user_id: null }, "osc") === false, "");
+  const orphanStore: UserDataStore = {
+    users: [{ id: "orphan", onshape_user_id: null }, { id: "user-a", onshape_user_id: "osa" }],
+    sessions: [{ id: "s-orphan", user_id: "orphan" }],
+    documents: [],
+    streaks: [],
+    badges: [],
+    records: [],
+  };
+  const c = applyOnshapeLogin(orphanStore, "osc", "user-c");
+  check("unbound existing row is not stolen by a new Onshape login", c.created === true && c.userId === "user-c" && orphanStore.users.some((u) => u.id === "orphan" && u.onshape_user_id === null), JSON.stringify(c));
 }
 
 {
