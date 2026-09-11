@@ -7,7 +7,7 @@ export type PushPayload = {
   title: string;
   body: string;
   url?: string;
-  type?: "streak" | "league";
+  type?: "streak" | "league" | "badge";
 };
 
 function vapidConfigured(): boolean {

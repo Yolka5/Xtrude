@@ -16,6 +16,7 @@
     }
   ],
   "crons": [
-    { "path": "/api/cron/discover", "schedule": "0 22 * * *" }
+    { "path": "/api/cron/discover", "schedule": "0 22 * * *" },
+    { "path": "/api/cron/push", "schedule": "0 18 * * *" }
   ]
 }

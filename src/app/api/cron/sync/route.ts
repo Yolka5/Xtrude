@@ -34,7 +34,14 @@ async function handle(req: NextRequest) {
       secretKey: requireEnv("ONSHAPE_SECRET_KEY"),
       trigger: "cron",
     });
-    return NextResponse.json({ ok: summary.errors.length === 0, ...summary });
+    let push: unknown = null;
+    try {
+      const { maybeSendPushReminders } = await import("@/lib/push/reminders");
+      push = await maybeSendPushReminders(new Date());
+    } catch {
+      push = null;
+    }
+    return NextResponse.json({ ok: summary.errors.length === 0, ...summary, push });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     return NextResponse.json({ ok: false, reason: "sync_failed", message }, { status: 500 });

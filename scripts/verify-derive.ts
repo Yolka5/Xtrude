@@ -19,6 +19,17 @@ import { NextRequest } from "next/server";
 import { discoveryDue, whoIsDue } from "../src/lib/discoverySchedule";
 import { applyOnshapeLogin, canRebindOnshapeId, sessionsFor, type UserDataStore } from "../src/lib/auth/bindUser";
 import { clientPushConfig, pushIsConfigured } from "../src/lib/push/config";
+import {
+  badgeAwardsToNotify,
+  isPastStreakRiskHour,
+  leagueOvertakes,
+  pushDedupeKey,
+  streakAtRiskShouldFire,
+} from "../src/lib/push/triggers";
+import { connectPathWithInvite, inviteCodeFromNext, invitePath, oauthStartPath, planJoinLanding, safeNextPath } from "../src/lib/invite";
+import { firstRunCopy } from "../src/lib/firstRun";
+import { connectPathWithInvite, inviteCodeFromNext, invitePath, planJoinLanding, safeNextPath } from "../src/lib/invite";
+import { firstRunCopy } from "../src/lib/firstRun";
 
 const DAY = 86_400_000;
 // Fix "today" to a known Wednesday: 2026-09-09 12:00 UTC (matches the app's
@@ -556,6 +567,187 @@ check(
   check("push is available when both VAPID keys exist", pushIsConfigured(env) === true, "");
 }
 
+{
+  const idt2000 = "2026-09-12T17:00:00.000Z";
+  const idt1959 = "2026-09-12T16:59:00.000Z";
+  const ist2000 = "2026-01-15T18:00:00.000Z";
+  const ist1959 = "2026-01-15T17:59:00.000Z";
+  const idt0100 = "2026-09-11T22:00:00.000Z";
+  check("20:00 IDT is past streak-risk hour", isPastStreakRiskHour(idt2000) === true, clockHmInZone(idt2000));
+  check("19:59 IDT is not past streak-risk hour", isPastStreakRiskHour(idt1959) === false, clockHmInZone(idt1959));
+  check("20:00 IST is past streak-risk hour", isPastStreakRiskHour(ist2000) === true, clockHmInZone(ist2000));
+  check("19:59 IST is not past streak-risk hour", isPastStreakRiskHour(ist1959) === false, clockHmInZone(ist1959));
+  const fire = (now: string, extra: Partial<Parameters<typeof streakAtRiskShouldFire>[0]> = {}) =>
+    streakAtRiskShouldFire({ now, currentStreak: 5, todaySessionCount: 0, alreadySentToday: false, ...extra });
+  check("streak at risk fires after 20:00 with an active streak and no session today", fire(idt2000) === true, "");
+  check("streak at risk does not fire at 19:59", fire(idt1959) === false, "");
+  check("streak at risk does not fire at 01:00 (new local day, before 20:00)", fire(idt0100) === false, clockHmInZone(idt0100));
+  check("streak at risk does not fire with no streak", fire(idt2000, { currentStreak: 0 }) === false, "");
+  check("streak at risk does not fire if a session already landed today", fire(idt2000, { todaySessionCount: 1 }) === false, "");
+  check("streak at risk does not fire twice the same day", fire(idt2000, { alreadySentToday: true }) === false, "");
+}
+
+{
+  const previous = [
+    { userId: "me", weekMinutes: 40, name: "Yoni" },
+    { userId: "ada", weekMinutes: 30, name: "Ada" },
+  ];
+  const passed = [
+    { userId: "me", weekMinutes: 40, name: "Yoni" },
+    { userId: "ada", weekMinutes: 45, name: "Ada" },
+  ];
+  const events = leagueOvertakes("me", previous, passed);
+  check("league overtake fires when someone passes your weekly total", events.length === 1 && events[0]!.passerId === "ada", JSON.stringify(events));
+  check(
+    "league overtake does not fire when you stay ahead",
+    leagueOvertakes("me", previous, [
+      { userId: "me", weekMinutes: 50, name: "Yoni" },
+      { userId: "ada", weekMinutes: 45, name: "Ada" },
+    ]).length === 0,
+    ""
+  );
+  check(
+    "league overtake does not fire on the first snapshot (no previous)",
+    leagueOvertakes("me", [], passed).length === 0,
+    ""
+  );
+  check(
+    "league overtake does not fire when the other person was already ahead",
+    leagueOvertakes(
+      "me",
+      [
+        { userId: "me", weekMinutes: 20, name: "Yoni" },
+        { userId: "ada", weekMinutes: 50, name: "Ada" },
+      ],
+      [
+        { userId: "me", weekMinutes: 25, name: "Yoni" },
+        { userId: "ada", weekMinutes: 60, name: "Ada" },
+      ]
+    ).length === 0,
+    ""
+  );
+  check(
+    "league overtake fires when a tie becomes a pass",
+    leagueOvertakes(
+      "me",
+      [
+        { userId: "me", weekMinutes: 40, name: "Yoni" },
+        { userId: "ada", weekMinutes: 40, name: "Ada" },
+      ],
+      [
+        { userId: "me", weekMinutes: 40, name: "Yoni" },
+        { userId: "ada", weekMinutes: 41, name: "Ada" },
+      ]
+    ).length === 1,
+    ""
+  );
+  check(
+    "league overtake does not fire when you pass them",
+    leagueOvertakes(
+      "me",
+      [
+        { userId: "me", weekMinutes: 30, name: "Yoni" },
+        { userId: "ada", weekMinutes: 50, name: "Ada" },
+      ],
+      [
+        { userId: "me", weekMinutes: 60, name: "Yoni" },
+        { userId: "ada", weekMinutes: 50, name: "Ada" },
+      ]
+    ).length === 0,
+    ""
+  );
+}
+
+{
+  const badges = [
+    { id: "first", name: "First Extrude", earned: true },
+    { id: "midnight", name: "After Midnight", earned: false },
+  ];
+  check(
+    "badge push does not fire on the first snapshot of already-earned badges",
+    badgeAwardsToNotify(null, badges).length === 0,
+    JSON.stringify(badgeAwardsToNotify(null, badges))
+  );
+  check(
+    "badge push does not fire before a badge is earned",
+    badgeAwardsToNotify([], [{ id: "first", name: "First Extrude", earned: false }]).length === 0,
+    ""
+  );
+  check(
+    "badge push fires when a badge is newly awarded against a snapshot",
+    badgeAwardsToNotify([], badges).map((b) => b.id).join(",") === "first",
+    JSON.stringify(badgeAwardsToNotify([], badges))
+  );
+  check("badge push does not fire again for a badge already snapshotted", badgeAwardsToNotify(["first"], badges).length === 0, "");
+  check(
+    "badge push fires only the newly awarded id when two exist",
+    badgeAwardsToNotify(["first"], [
+      { id: "first", name: "First Extrude", earned: true },
+      { id: "midnight", name: "After Midnight", earned: true },
+    ]).map((b) => b.id).join(",") === "midnight",
+    ""
+  );
+}
+
+{
+  check(
+    "push dedupe keys differ across days so the same alert can fire tomorrow",
+    pushDedupeKey("u1", "streak", "2026-09-11") !== pushDedupeKey("u1", "streak", "2026-09-12"),
+    ""
+  );
+  check(
+    "push dedupe keys differ by kind so a streak alert does not block a badge",
+    pushDedupeKey("u1", "streak", "2026-09-11") !== pushDedupeKey("u1", "badge", "2026-09-11"),
+    ""
+  );
+}
+
+{
+  const loggedOut = planJoinLanding({ code: "abc234", sessionUserId: null });
+  check(
+    "logged-out invite goes through /connect/ with the code in next",
+    loggedOut.action === "connect" &&
+      loggedOut.action === "connect" &&
+      loggedOut.code === "ABC234" &&
+      loggedOut.next === invitePath("ABC234") &&
+      connectPathWithInvite("ABC234").includes(encodeURIComponent(invitePath("ABC234"))),
+    JSON.stringify(loggedOut)
+  );
+  check(
+    "logged-in invite joins as that session user, not a fallback",
+    JSON.stringify(planJoinLanding({ code: "ABC234", sessionUserId: "user-b" })) ===
+      JSON.stringify({ action: "join", code: "ABC234", userId: "user-b" }),
+    ""
+  );
+  check("invite without a code is invalid", planJoinLanding({ code: null, sessionUserId: "user-b" }).action === "invalid", "");
+  check("invite with junk is invalid", planJoinLanding({ code: "!!", sessionUserId: "user-b" }).action === "invalid", "");
+  check("oauth start keeps the invite next", oauthStartPath(invitePath("ABC234")).includes("next="), "");
+  check("oauth start ignores an open-redirect next", oauthStartPath("https://evil.example/") === "/api/auth/onshape/start", "");
+  check("invite is not read from a non-join next", inviteCodeFromNext("/league/?code=ABC234") === null, "");
+  check("protocol-relative next is rejected", safeNextPath("//evil.example/join/?code=ABC234") === null, "");
+}
+
+{
+  check("first run is off once any session exists", firstRunCopy({ hasAnyData: true, onshapeConnected: false }) === null, "");
+  const disconnected = firstRunCopy({ hasAnyData: false, onshapeConnected: false });
+  check(
+    "first run asks to connect Onshape when unbound",
+    disconnected?.headline === "Connect Onshape to start" && disconnected.action?.href === "/connect/",
+    JSON.stringify(disconnected)
+  );
+  const connected = firstRunCopy({ hasAnyData: false, onshapeConnected: true });
+  check(
+    "first run asks a connected user to go model, with no CTA to fake data",
+    connected?.headline === "Go model something" && connected.action === null,
+    JSON.stringify(connected)
+  );
+  check(
+    "first run does not invent a streak or a zero score",
+    !/[0-9]/.test(`${disconnected?.headline}${disconnected?.body}${connected?.headline}${connected?.body}`.replace(/Onshape|Xtrude/g, "")),
+    JSON.stringify({ disconnected, connected })
+  );
+}
+
 void (async () => {
   const secret = "x".repeat(32);
   const uid = "e7b3c91a-4d2f-4a8e-9c15-6f8a2d4b1e70";
@@ -586,6 +778,12 @@ void (async () => {
       "REQUIRE_AUTH=1 sends a logged-out / to /connect/",
       homeRes.status >= 300 && homeRes.status < 400 && (homeRes.headers.get("location") ?? "").includes("/connect"),
       `status=${homeRes.status} loc=${homeRes.headers.get("location")}`
+    );
+    const joinRes = await proxy(loggedOut("/join/?code=ABC234"));
+    check(
+      "REQUIRE_AUTH=1 leaves /join/ public so the invite query is not stripped",
+      isPublicPath("/join/") && joinRes.status < 300 && !(joinRes.headers.get("location") ?? "").includes("/connect"),
+      `status=${joinRes.status} loc=${joinRes.headers.get("location")}`
     );
     const adminRes = await proxy(loggedOut("/admin/"));
     check(

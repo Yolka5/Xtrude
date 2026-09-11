@@ -40,7 +40,14 @@ export async function POST() {
       secretKey: requireEnv("ONSHAPE_SECRET_KEY"),
       trigger: "page",
     });
-    return NextResponse.json({ ok: summary.errors.length === 0, skipped: false, ...summary });
+    let push: unknown = null;
+    try {
+      const { maybeSendPushReminders } = await import("@/lib/push/reminders");
+      push = await maybeSendPushReminders(new Date());
+    } catch {
+      push = null;
+    }
+    return NextResponse.json({ ok: summary.errors.length === 0, skipped: false, ...summary, push });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     return NextResponse.json({ ok: false, reason: "sync_failed", message }, { status: 500 });
