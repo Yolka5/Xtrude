@@ -22,3 +22,5 @@ I did not stop for these. Defaults I used are in brackets.
 
 10. **Onshape call cap** — [Default 100 per cron/backfill/discovery run via `ONSHAPE_MAX_CALLS_PER_RUN`. Remaining work waits for the next run.]
 
+11. **Sign-out vs Yoni fallback** — With `REQUIRE_AUTH` unset, a visitor who has **no** cookie still sees Yoni’s data (`getCurrentUserId` fallback). Sign-out clears and invalidates the cookie; `REQUIRE_AUTH=1` is what makes every app page behave as logged-out. [Left `REQUIRE_AUTH` unset.]
+

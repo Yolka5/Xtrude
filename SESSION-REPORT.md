@@ -1,67 +1,55 @@
-# Session report — 11 Sep 2026 (OAuth refresh / call cap / session detail / profile)
+# Session report — 11 Sep 2026 (sign-out)
 
 Branch: **`session/oauth-leagues-streaks`** (no new branch).  
-Previous follow-up on this branch is local-only (`55c2ecf`, 4 commits ahead of origin). This work was not pushed.  
+Previous work on this branch (OAuth refresh, call cap, session detail, profile) is already committed locally and was not pushed. This follow-up adds sign-out.  
 Production deploy this session: **none**. Preview deploy: **none**.  
 SQL against live Supabase: **none**. New migration files: **none**.  
 Onshape API calls this session: **0** (budget 0). Running count:
 
 | # | Call | Why |
 |---|---|---|
-| — | *(none)* | Refresh, cap, session-detail, and profile work are stubbed or local. |
+| — | *(none)* | Sign-out is cookie + `app_state` only. Tasks 2–5 were already stubbed/local. |
 
-Off-limits this follow-up (untouched except discovery *wiring* for the shared call cap and reauth skip): discovery schedule/algorithm, badge/streak math in `derive.ts`, league rename/regen, auth binding, push triggers, invite flow, Today first-run.
+Off-limits this follow-up (untouched): discovery schedule/algorithm, badge/streak math in `derive.ts`, league rename/regen, auth binding, push triggers, invite flow, Today first-run.
 
 ---
 
 ## Finished
 
-### 1. OAuth token refresh
-Before a stored access token is used, `withOAuthAccess` checks expiry (5-minute skew). An expired token does **one** refresh, stores the new pair, then runs the original request. A 401/403 on a still-fresh token also refreshes once and retries. Failed refresh (or 401 after that single refresh) writes `app_state` `oauth_reauth_<userId>`, and `getValidAccessToken` returns null so discovery/onboarding skip that user until they reconnect at `/connect/` (which clears the flag). Banner in the app chrome; `/admin` lists flagged users.
+### 1. Sign out (this follow-up)
+Profile has a **Sign out** button that POSTs `/api/auth/logout`. The handler stamps `app_state` `session_logout_<userId>` with the current unix time, then clears the httpOnly `xtrude_session` cookie with the same path/sameSite/secure flags used at login, and redirects to `/connect/`. Session cookies now carry an issued-at (`i`). Any cookie issued at or before that stamp is unauthenticated — replaying the old cookie does not restore the session.
 
-**Tests (mutation-checked):** expired token → 1 refresh + 1 original request. Failed refresh → `needs_reauth` and 0 requests; a later call with the flag is `blocked`. Skipping the pre-request refresh used the stale token and the check **red** → reverted. 401-then-retry is also covered.
+With `REQUIRE_AUTH=1`, `/sessions/` (and other non-public pages) send a replayed signed-out cookie to `/connect/`. App pages set `Cache-Control: private, no-store`. The service worker drops `xtrude-*` caches on a `signout` message and does not cache `no-store` navigations.
 
-### 2. Hard cap on Onshape calls per cron run
-`ONSHAPE_MAX_CALLS_PER_RUN` (default **100**) is one shared counter for a sync, discovery, backfill, or webhook-script run. Hitting it stops immediately, logs calls used and where it stopped, and leaves remaining work for the next run. Discovery also skips users already flagged for reauth. `/admin` shows the configured cap and `callsUsed/maxCalls` on last sync/discovery (including a STOPPED line when the cap hit).
+**Tests (mutation-checked):** old cookie is still HMAC-valid (why a server stamp is required) but `authenticatedUserId` returns null after logout; a newer cookie after reconnect works. Proxy + `REQUIRE_AUTH=1` redirects `/sessions/` when the same cookie is sent with the logout stamp. Treating signed-out cookies as still active → those checks **red** → reverted.
 
-**Tests (mutation-checked):** stubbed 150 planned calls stop at 100 and log `stoppedAt`. Removing the throw-at-cap path completed 150 → **red** → reverted.
-
-### 3. Session detail screen
-`/sessions/[id]` loads that row plus events in its timestamp range. Documents show real event counts. If events are missing, names from `document_ids` are listed with **unknown** edits — never a fake 0. Start, end, duration, raw event count, and the span that qualified the cluster (need ≥2 events and ≥2 minutes) are on the screen.
-
-**Tests (mutation-checked):** counting two named docs; nameless events ignored; no invented 0. Id-only fallback uses `edits: null`. Returning `edits: 0` → **red** → reverted.
-
-### 4. Profile screen
-Display name saves to `users.display_name` (and derived initials) via `POST /api/profile`, not `localStorage`. Lifetime hours / current / best streak still come from `derive`. Member since uses `users.created_at`. Avatar only if OAuth callback stored an `http(s)` URL from sessioninfo `image` (captured then, not on profile view). Otherwise no initials/color placeholder.
-
-**Tests (mutation-checked):** `https`/`http` kept; `cid:`, relative, and bare strings skipped. Accepting any non-empty image → **red** → reverted.
+### 2–5. Already on this branch (not re-touched)
+- **OAuth refresh:** one refresh then original request; failed refresh → needs-reauth, no further calls; banner + `/admin`.
+- **Call cap:** `ONSHAPE_MAX_CALLS_PER_RUN` default 100; 150 planned stops at 100 and logs `stoppedAt`; visible on `/admin`.
+- **Session detail:** real documents/times/event count/span; no fake 0 edits.
+- **Profile:** editable `users.display_name`; hours/streaks from derive; member since `users.created_at`; avatar only if sessioninfo `image` is an `http(s)` URL captured at OAuth callback.
 
 ---
 
 ## Compiles but unverified
 
-- A live expired token actually refreshing against Onshape (would spend quota).
-- Session detail and profile in the browser — local `next dev` against the production env can background-sync (Onshape). Skipped to keep the budget at 0.
-- A cron run actually stopping at 100 calls in production.
+- Clicking Sign out in a real browser (did not run `next dev` against production env — that can background-sync Onshape).
+- `REQUIRE_AUTH` is still unset, so a visitor with **no** cookie still falls back to Yoni’s row. Pages that *require* a session are the `REQUIRE_AUTH=1` set; those treat a signed-out cookie as logged out.
 
 ---
 
 ## Skipped, and why
 
-- **Discovery schedule / badges / streaks / league rename / auth binding / push / invite / Today first-run** — off limits.
+- **Discovery / badges / streaks / league rename / auth binding / push / invite / Today first-run** — off limits.
 - **Any Onshape CAD call** — budget 0.
-- **SQL / new migrations** — reauth flag and image URL use existing `app_state`.
+- **SQL / new migrations** — logout stamp uses existing `app_state`.
 - **Production or preview deploy** — forbidden.
-- **Dirty sync for OAuth users** — still API-key / Yoni-only; OAuth refresh applies wherever `getValidAccessToken` is used (discovery, onboarding).
 
 ---
 
 ## Commits on this branch this session
 
-1. Refresh stored Onshape tokens before use, and stop calling until the user reconnects.
-2. Stop a cron run at 100 Onshape calls so leftover work waits for the next run.
-3. Show real session documents, times, and qualifying event span instead of placeholder edits.
-4. Persist display name, use real account dates, and skip avatars unless Onshape gave a URL.
-5. (this file)
+1. Sign out server-side so a replayed session cookie is logged out, not cached data.
+2. (this file)
 
-`npm run verify` is green after every task.
+`npm run verify` is green.
