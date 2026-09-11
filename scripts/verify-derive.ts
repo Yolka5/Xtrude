@@ -11,7 +11,7 @@
 import { deriveRealData } from "../src/lib/db/derive";
 import { clusterSessions, MIN_EVENTS, MIN_SPAN_MINUTES } from "./lib/sessionAlgorithm.mjs";
 import { calendarDateInZone, clockHmInZone } from "./lib/timezone.mjs";
-import { rankStandings } from "../src/lib/leagueStandings";
+import { rankStandings, generateJoinCode } from "../src/lib/leagueStandings";
 import { decryptSecret, encryptSecret } from "../src/lib/auth/tokenCrypto";
 import { createSessionToken, readSessionUserId } from "../src/lib/auth/session";
 
@@ -273,6 +273,11 @@ const solo = rankStandings(
   "me"
 );
 check("league: a league of one ranks first, isMe, holding", solo.length === 1 && solo[0].rank === 1 && solo[0].isMe && solo[0].movement === 0 && solo[0].scoredMinutes === 47, JSON.stringify(solo[0]));
+check(
+  "league join code is 6 unambiguous chars",
+  generateJoinCode(new Uint8Array([0, 1, 2, 3, 4, 5])).length === 6,
+  generateJoinCode(new Uint8Array([0, 1, 2, 3, 4, 5]))
+);
 
 {
   const secret = "x".repeat(32);

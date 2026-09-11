@@ -2,6 +2,7 @@ import "server-only";
 import { getSupabase } from "./client";
 import type { League } from "@/lib/fixtures";
 import {
+  generateJoinCode,
   minutesInDateRange,
   rankStandings,
   weekWindow,
@@ -169,4 +170,62 @@ export async function getLeagueView(userId: string, leagueId?: string | null): P
     allLeagues: summaries,
     tablesReady: true,
   };
+}
+
+export async function createLeague(userId: string, rawName: string): Promise<{ id: string; joinCode: string }> {
+  const name = rawName.trim().slice(0, 48);
+  if (name.length < 2) throw new Error("Name needs at least 2 characters.");
+  const sb = getSupabase();
+  for (let attempt = 0; attempt < 6; attempt++) {
+    const joinCode = generateJoinCode();
+    const { data, error } = await sb
+      .from("leagues")
+      .insert({ name, join_code: joinCode, created_by: userId })
+      .select("id, join_code")
+      .single();
+    if (error) {
+      if (isMissingTable(error.message)) throw new Error("Run supabase/migrate-leagues.sql first.");
+      if (/duplicate|unique/i.test(error.message)) continue;
+      throw new Error(error.message);
+    }
+    const { error: memberErr } = await sb
+      .from("league_members")
+      .insert({ league_id: data.id, user_id: userId });
+    if (memberErr) throw new Error(memberErr.message);
+    return { id: data.id as string, joinCode: data.join_code as string };
+  }
+  throw new Error("Could not allocate a join code.");
+}
+
+export async function joinLeagueByCode(userId: string, rawCode: string): Promise<{ id: string }> {
+  const code = rawCode.trim().toUpperCase();
+  if (code.length < 4) throw new Error("That join code is too short.");
+  const sb = getSupabase();
+  const { data: league, error } = await sb
+    .from("leagues")
+    .select("id")
+    .eq("join_code", code)
+    .maybeSingle();
+  if (error) {
+    if (isMissingTable(error.message)) throw new Error("Run supabase/migrate-leagues.sql first.");
+    throw new Error(error.message);
+  }
+  if (!league) throw new Error("No league uses that code.");
+  const { error: memberErr } = await sb
+    .from("league_members")
+    .upsert({ league_id: league.id, user_id: userId }, { onConflict: "league_id,user_id" });
+  if (memberErr) throw new Error(memberErr.message);
+  return { id: league.id as string };
+}
+
+export async function leaveLeague(userId: string, leagueId: string): Promise<void> {
+  const { error } = await getSupabase()
+    .from("league_members")
+    .delete()
+    .eq("league_id", leagueId)
+    .eq("user_id", userId);
+  if (error) {
+    if (isMissingTable(error.message)) throw new Error("Run supabase/migrate-leagues.sql first.");
+    throw new Error(error.message);
+  }
 }

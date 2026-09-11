@@ -63,6 +63,14 @@ export type StandingInput = {
   lastWeekMinutes: number;
 };
 
+export function generateJoinCode(seed?: Uint8Array): string {
+  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  const bytes = seed ?? crypto.getRandomValues(new Uint8Array(6));
+  let out = "";
+  for (let i = 0; i < 6; i++) out += alphabet[bytes[i]! % alphabet.length];
+  return out;
+}
+
 export function rankStandings(inputs: StandingInput[], meId: string): LeagueMember[] {
   const byThisWeek = [...inputs].sort((a, b) => {
     if (b.weekMinutes !== a.weekMinutes) return b.weekMinutes - a.weekMinutes;

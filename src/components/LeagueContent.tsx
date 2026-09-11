@@ -16,10 +16,12 @@ const ROW_H = 64; // .rowitem's min-height (62px) + its 2px border
 export function LeagueContent({
   league,
   lonely,
+  children,
 }: {
   league: League;
   /** One real member, no fixtures — say so, without an "example data" chip. */
   lonely?: boolean;
+  children?: React.ReactNode;
 }) {
   const reduced = useReducedMotion();
   const me = league.members.find((m) => m.isMe) ?? league.members[0];
@@ -207,6 +209,8 @@ export function LeagueContent({
           </div>
         </section>
       </FlyItem>
+
+      {children}
     </main>
   );
 }
