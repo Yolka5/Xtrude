@@ -1,5 +1,7 @@
 import { getSupabase } from "@/lib/db/client";
 import { getCurrentUserId } from "@/lib/auth/currentUser";
+import { listReauthFlags } from "@/lib/auth/tokens";
+import { maxCallsPerRun } from "../../../scripts/lib/callBudget.mjs";
 
 export const dynamic = "force-dynamic";
 
@@ -51,6 +53,8 @@ export default async function AdminPage() {
   const lastSync = stateRows?.find((r) => r.key === "last_sync");
   const lastDiscovery = stateRows?.find((r) => r.key === "last_discovery");
   const lastRollup = stateRows?.find((r) => r.key === "last_rollup");
+  const reauthFlags = await listReauthFlags();
+  const callCap = maxCallsPerRun();
 
   const rows = (deliveries ?? []) as unknown as Delivery[];
   const mostRecent = rows[0]?.received_at;
@@ -98,6 +102,11 @@ export default async function AdminPage() {
           detail={lastRollup ? summarizeRollup(lastRollup.value) : "same job as discovery, midnight Asia/Jerusalem"}
         />
         <StatusCard
+          label="Onshape call cap / run"
+          value={String(callCap)}
+          detail="ONSHAPE_MAX_CALLS_PER_RUN (default 100). Sync, discovery, and backfill share one counter per run."
+        />
+        <StatusCard
           label="Vercel env"
           value={envMissing.length === 0 ? "all set" : `${envMissing.length} missing`}
           detail={
@@ -109,6 +118,35 @@ export default async function AdminPage() {
           }
         />
       </section>
+
+      {reauthFlags.length > 0 ? (
+        <section style={{ marginBottom: 24, border: "1px solid #c2290a", borderRadius: 8, padding: 12 }}>
+          <h2 style={{ fontSize: 15, margin: "0 0 8px", color: "#c2290a" }}>Needs Onshape reauth</h2>
+          <p style={{ fontSize: 12, color: "#666", margin: "0 0 8px" }}>
+            Refresh failed. No further Onshape calls for these users until they reconnect at /connect/.
+          </p>
+          <table style={{ borderCollapse: "collapse", width: "100%", fontSize: 12 }}>
+            <thead>
+              <tr style={{ textAlign: "left", borderBottom: "1px solid #ccc" }}>
+                <Th>User</Th>
+                <Th>Why</Th>
+                <Th>Since</Th>
+              </tr>
+            </thead>
+            <tbody>
+              {reauthFlags.map((f) => (
+                <tr key={f.userId} style={{ borderBottom: "1px solid #eee" }}>
+                  <Td>{f.userId}</Td>
+                  <Td>{f.reason}</Td>
+                  <Td>{f.at}</Td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </section>
+      ) : (
+        <p style={{ fontSize: 12, color: "#666", marginBottom: 24 }}>No users flagged for Onshape reauth.</p>
+      )}
 
       {Array.isArray((lastDiscovery?.value as { users?: unknown[] } | undefined)?.users) ? (
         <section style={{ marginBottom: 24 }}>
@@ -194,10 +232,20 @@ function Td({ children }: { children: React.ReactNode }) {
   return <td style={{ padding: "6px 10px 6px 0", verticalAlign: "top" }}>{children}</td>;
 }
 
+function budgetLine(v: any): string | null {
+  const b = v?.budget;
+  if (!b) return null;
+  const used = `${b.callsUsed ?? 0}/${b.maxCalls ?? "?"} Onshape calls`;
+  if (!b.hit) return used;
+  return `${used} — STOPPED at cap, last attempted ${b.stoppedAt ?? "unknown"}`;
+}
+
 function summarizeSync(v: any): string {
   if (!v) return "";
   const parts = [`${v.documentsSynced ?? 0}/${v.documentsChecked ?? 0} docs synced`, `${v.eventsWritten ?? 0} events written`];
   if (v.rebuild) parts.push(`${v.rebuild.sessionsWritten ?? 0} sessions`);
+  const cap = budgetLine(v);
+  if (cap) parts.push(cap);
   if (v.errors?.length) parts.push(`${v.errors.length} error(s)`);
   return parts.join(" · ");
 }
@@ -223,7 +271,9 @@ function summarizeDiscovery(v: any): string {
       `${v.webhooksRegistered ?? 0} registered`
     );
   }
-  parts.push(`${v.callsUsed ?? 0} calls`);
+  const cap = budgetLine(v);
+  if (cap) parts.push(cap);
+  else parts.push(`${v.callsUsed ?? 0} calls`);
   if (v.errors?.length) parts.push(`${v.errors.length} error(s)`);
   return parts.join(" · ");
 }

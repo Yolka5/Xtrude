@@ -8,6 +8,7 @@ import { MotionProvider } from "@/components/MotionProvider";
 import { NavTitleProvider } from "@/components/NavTitle";
 import { ServiceWorker } from "@/components/ServiceWorker";
 import { FONT_VARS } from "@/lib/fonts";
+import { ReauthBanner } from "@/components/ReauthBanner";
 
 export const metadata: Metadata = {
   title: "Xtrude",
@@ -61,6 +62,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <MotionProvider>
             <AppChrome />
             <div className="app">
+              <ReauthBanner />
               <PageTransition>{children}</PageTransition>
             </div>
             {/* No scroll-edge fades needed anymore: the nav bar is solid once
