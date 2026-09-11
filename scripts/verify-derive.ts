@@ -14,6 +14,7 @@ import { calendarDateInZone, clockHmInZone } from "./lib/timezone.mjs";
 import { rankStandings, generateJoinCode } from "../src/lib/leagueStandings";
 import { decryptSecret, encryptSecret } from "../src/lib/auth/tokenCrypto";
 import { createSessionToken, readSessionUserId } from "../src/lib/auth/session";
+import { discoveryDue, whoIsDue } from "../src/lib/discoverySchedule";
 
 const DAY = 86_400_000;
 // Fix "today" to a known Wednesday: 2026-09-09 12:00 UTC (matches the app's
@@ -352,6 +353,52 @@ check(
     "a used freeze is reported, never hidden",
     frozen.streak.freezeUsedDates.includes("2026-09-07"),
     JSON.stringify(frozen.streak.freezeUsedDates)
+  );
+}
+
+{
+  // Cron day: Friday 11 Sep 2026, noon Israel (09:00 UTC). Discovery is
+  // decided from sessions + last-discovery stamps — no Onshape calls.
+  const cronNow = Date.parse("2026-09-11T09:00:00.000Z");
+  const synthetic = [
+    {
+      id: "active-yesterday",
+      lastSessionAt: "2026-09-10T16:00:00.000Z",
+      lastDiscoveredAt: "2026-09-10T18:00:00.000Z",
+    },
+    {
+      id: "quiet-10d",
+      lastSessionAt: "2026-09-01T16:00:00.000Z",
+      lastDiscoveredAt: "2026-09-08T22:05:00.000Z",
+    },
+    {
+      id: "brand-new",
+      lastSessionAt: null,
+      lastDiscoveredAt: "2026-09-11T08:00:00.000Z",
+    },
+    {
+      id: "dormant-months",
+      lastSessionAt: "2026-03-01T16:00:00.000Z",
+      lastDiscoveredAt: "2026-07-01T22:05:00.000Z",
+    },
+  ];
+  const decisions = whoIsDue(synthetic, cronNow);
+  const dueIds = decisions.filter((d) => d.decision.due).map((d) => d.user.id).sort();
+  const skippedIds = decisions.filter((d) => !d.decision.due).map((d) => d.user.id).sort();
+  check(
+    "discovery: active yesterday and dormant months are due; 10-day weekly and onboarded-today are skipped",
+    dueIds.join(",") === "active-yesterday,dormant-months" && skippedIds.join(",") === "brand-new,quiet-10d",
+    `due=${dueIds.join(",")} skipped=${skippedIds.join(",")}`
+  );
+  const byId = Object.fromEntries(decisions.map((d) => [d.user.id, d.decision]));
+  check("discovery: yesterday's modeller is daily", byId["active-yesterday"]?.cadence === "daily" && /daily due/.test(byId["active-yesterday"]?.reason ?? ""), JSON.stringify(byId["active-yesterday"]));
+  check("discovery: 10-day-quiet is weekly and not yet due", byId["quiet-10d"]?.cadence === "weekly" && byId["quiet-10d"]?.due === false, JSON.stringify(byId["quiet-10d"]));
+  check("discovery: brand-new onboarded today is skipped", byId["brand-new"]?.due === false && /already discovered today|weekly/.test(byId["brand-new"]?.reason ?? ""), JSON.stringify(byId["brand-new"]));
+  check("discovery: dormant months is weekly due", byId["dormant-months"]?.cadence === "weekly" && byId["dormant-months"]?.due === true, JSON.stringify(byId["dormant-months"]));
+  check(
+    "discovery: never-discovered brand-new is due (connect cron backstop)",
+    discoveryDue({ now: cronNow, lastSessionAt: null, lastDiscoveredAt: null }).due === true,
+    JSON.stringify(discoveryDue({ now: cronNow, lastSessionAt: null, lastDiscoveredAt: null }))
   );
 }
 

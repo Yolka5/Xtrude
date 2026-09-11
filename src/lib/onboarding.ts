@@ -5,13 +5,9 @@ import { rebuildSessions } from "../../scripts/lib/sessionRebuild.mjs";
 import { getSupabase } from "@/lib/db/client";
 import { getValidAccessToken } from "@/lib/auth/tokens";
 import { requireEnv } from "@/lib/env";
+import { DISCOVERY_EVENTS, stampUserDiscovered } from "@/lib/discoverDocuments";
 
-const EVENTS = [
-  "onshape.model.lifecycle.changed",
-  "onshape.model.lifecycle.createversion",
-  "onshape.model.lifecycle.createelement",
-  "onshape.model.lifecycle.deleteelement",
-];
+const EVENTS = DISCOVERY_EVENTS;
 
 export const ONBOARD_MAX_DOCS = 20;
 /** list(1) + up to 20 workspace + 20 history + 20 webhook = 61. Padding for retries. */
@@ -114,6 +110,7 @@ export async function onboardUser(userId: string): Promise<OnboardSummary> {
   }
 
   summary.callsUsed = onshape.callsUsed();
+  await stampUserDiscovered(supabase, userId, now, { source: "onboard" });
   return summary;
 }
 
