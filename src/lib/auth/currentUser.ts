@@ -2,7 +2,35 @@ import "server-only";
 import { cookies } from "next/headers";
 import { APP_USER_ID } from "../../../scripts/lib/appUser.mjs";
 import { getAuthSecret } from "./secret";
-import { readSessionUserId, SESSION_COOKIE } from "./session";
+import { getSupabase } from "@/lib/db/client";
+import {
+  parseLogoutStamp,
+  readSessionClaims,
+  sessionActiveAfterLogout,
+  SESSION_COOKIE,
+  sessionLogoutKey,
+} from "./session";
+
+async function sessionUserFromCookie(): Promise<string | null> {
+  try {
+    const jar = await cookies();
+    const claims = await readSessionClaims(jar.get(SESSION_COOKIE)?.value, getAuthSecret());
+    if (!claims) return null;
+    try {
+      const { data } = await getSupabase()
+        .from("app_state")
+        .select("value")
+        .eq("key", sessionLogoutKey(claims.userId))
+        .maybeSingle();
+      if (!sessionActiveAfterLogout(claims, parseLogoutStamp(data?.value))) return null;
+    } catch {
+      // Stamp lookup failed: HMAC is still valid, same as "never logged out".
+    }
+    return claims.userId;
+  } catch {
+    return null;
+  }
+}
 
 /**
  * The user this request should act as.
@@ -13,21 +41,9 @@ import { readSessionUserId, SESSION_COOKIE } from "./session";
  * logged-out visitors to /connect instead (see src/proxy.ts).
  */
 export async function getCurrentUserId(): Promise<string> {
-  try {
-    const jar = await cookies();
-    const userId = await readSessionUserId(jar.get(SESSION_COOKIE)?.value, getAuthSecret());
-    if (userId) return userId;
-  } catch {
-    // cookies() is unavailable in some script/build contexts
-  }
-  return APP_USER_ID;
+  return (await sessionUserFromCookie()) ?? APP_USER_ID;
 }
 
 export async function getSessionUserId(): Promise<string | null> {
-  try {
-    const jar = await cookies();
-    return await readSessionUserId(jar.get(SESSION_COOKIE)?.value, getAuthSecret());
-  } catch {
-    return null;
-  }
+  return sessionUserFromCookie();
 }

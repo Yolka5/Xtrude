@@ -13,7 +13,7 @@ import { clusterSessions, MIN_EVENTS, MIN_SPAN_MINUTES } from "./lib/sessionAlgo
 import { calendarDateInZone, clockHmInZone, isAfterMidnightWindow } from "./lib/timezone.mjs";
 import { rankStandings, generateJoinCode, JOIN_CODE_ALPHABET, JOIN_CODE_LENGTH, joinCodeIsUnambiguous, allocateJoinCode, renameLeagueState, regenerateLeagueCode } from "../src/lib/leagueStandings";
 import { decryptSecret, encryptSecret } from "../src/lib/auth/tokenCrypto";
-import { createSessionToken, readSessionUserId } from "../src/lib/auth/session";
+import { createSessionToken, readSessionUserId, authenticatedUserId, SESSION_COOKIE } from "../src/lib/auth/session";
 import { proxy, isPublicPath } from "../src/proxy";
 import { NextRequest } from "next/server";
 import { discoveryDue, whoIsDue } from "../src/lib/discoverySchedule";
@@ -904,8 +904,35 @@ void (async () => {
   const tampered = tok.slice(0, -3) + "aaa";
   check("session cookie rejects tampering", (await readSessionUserId(tampered, secret)) === null, "");
 
+  const issued = Math.floor(Date.now() / 1000) - 10;
+  const logoutAt = issued + 5;
+  const oldCookie = await createSessionToken(uid, secret, issued);
+  check(
+    "old cookie is still HMAC-valid after sign-out (replay is why we need a server stamp)",
+    (await readSessionUserId(oldCookie, secret)) === uid,
+    ""
+  );
+  check(
+    "after sign-out, a request carrying the old cookie is treated as unauthenticated",
+    (await authenticatedUserId(oldCookie, secret, logoutAt)) === null,
+    String(await authenticatedUserId(oldCookie, secret, logoutAt))
+  );
+  check(
+    "the same cookie stays authenticated if the user never signed out",
+    (await authenticatedUserId(oldCookie, secret, null)) === uid,
+    ""
+  );
+  const reconnected = await createSessionToken(uid, secret, logoutAt + 1);
+  check(
+    "a new session after reconnect is authenticated",
+    (await authenticatedUserId(reconnected, secret, logoutAt)) === uid,
+    ""
+  );
+
   const prevAuth = process.env.REQUIRE_AUTH;
+  const prevSecret = process.env.AUTH_SECRET;
   process.env.REQUIRE_AUTH = "1";
+  process.env.AUTH_SECRET = secret;
   try {
     const loggedOut = (path: string) => new NextRequest(new URL(path, "http://localhost:3000"));
     let sessionsRes: Response | null = null;
@@ -938,9 +965,26 @@ void (async () => {
       adminRes.status < 300 && !(adminRes.headers.get("location") ?? "").includes("/connect") && isPublicPath("/admin/"),
       `status=${adminRes.status} loc=${adminRes.headers.get("location")}`
     );
+    const replay = new NextRequest(new URL("/sessions/", "http://localhost:3000"), {
+      headers: { cookie: `${SESSION_COOKIE}=${oldCookie}` },
+    });
+    const replayRes = await proxy(replay, { loggedOutAt: async () => logoutAt });
+    check(
+      "REQUIRE_AUTH=1 treats a signed-out cookie on /sessions/ as logged out",
+      replayRes.status >= 300 && replayRes.status < 400 && (replayRes.headers.get("location") ?? "").includes("/connect"),
+      `status=${replayRes.status} loc=${replayRes.headers.get("location")}`
+    );
+    const liveRes = await proxy(replay, { loggedOutAt: async () => null });
+    check(
+      "REQUIRE_AUTH=1 still accepts a live cookie on /sessions/",
+      liveRes.status < 300 && !(liveRes.headers.get("location") ?? "").includes("/connect"),
+      `status=${liveRes.status} loc=${liveRes.headers.get("location")}`
+    );
   } finally {
     if (prevAuth === undefined) delete process.env.REQUIRE_AUTH;
     else process.env.REQUIRE_AUTH = prevAuth;
+    if (prevSecret === undefined) delete process.env.AUTH_SECRET;
+    else process.env.AUTH_SECRET = prevSecret;
   }
 
   console.log(failures ? `\n${failures} check(s) FAILED` : "\nAll checks pass.");

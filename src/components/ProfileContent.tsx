@@ -218,9 +218,22 @@ export function ProfileContent({
             ? `${daysTracked} days tracked · ${duration(profile.lifetimeMinutes)} scored`
             : "Day one · nothing modeled yet"}
         </p>
-        <p className="t-caption dimmer" style={{ margin: "12px 4px 0", textAlign: "center" }}>
-          <a href="/api/auth/logout" className="t-caption" style={{ color: "inherit" }}>Sign out</a>
-        </p>
+        <form
+          action="/api/auth/logout"
+          method="POST"
+          style={{ margin: "16px 0 0", textAlign: "center" }}
+          onSubmit={() => {
+            try {
+              navigator.serviceWorker?.controller?.postMessage({ type: "signout" });
+            } catch {
+              /* cache clear is best-effort */
+            }
+          }}
+        >
+          <button type="submit" className="text-btn text-btn--strong">
+            Sign out
+          </button>
+        </form>
         <NotificationSettings />
       </FlyItem>
     </main>

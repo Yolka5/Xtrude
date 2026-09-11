@@ -43,17 +43,48 @@ async function hmac(secret: string, message: string): Promise<string> {
   return b64url(new Uint8Array(sig));
 }
 
-export async function createSessionToken(userId: string, secret: string): Promise<string> {
-  const exp = Math.floor(Date.now() / 1000) + SESSION_MAX_AGE_SEC;
-  const payload = b64url(new TextEncoder().encode(JSON.stringify({ u: userId, e: exp })));
+export type SessionClaims = {
+  userId: string;
+  exp: number;
+  iat: number;
+};
+
+export function sessionLogoutKey(userId: string): string {
+  return `session_logout_${userId}`;
+}
+
+export function parseLogoutStamp(value: unknown): number | null {
+  if (!value || typeof value !== "object") return null;
+  const at = (value as { at?: unknown }).at;
+  return typeof at === "number" && Number.isFinite(at) ? at : null;
+}
+
+/** Issued-at must be strictly after the last logout, or the cookie is dead. */
+export function sessionActiveAfterLogout(
+  claims: SessionClaims | null,
+  loggedOutAtSec: number | null | undefined
+): boolean {
+  if (!claims) return false;
+  if (loggedOutAtSec == null) return true;
+  return claims.iat > loggedOutAtSec;
+}
+
+export async function createSessionToken(
+  userId: string,
+  secret: string,
+  nowSec: number = Math.floor(Date.now() / 1000)
+): Promise<string> {
+  const exp = nowSec + SESSION_MAX_AGE_SEC;
+  const payload = b64url(new TextEncoder().encode(JSON.stringify({ u: userId, e: exp, i: nowSec })));
   const sig = await hmac(secret, payload);
   return `${payload}.${sig}`;
 }
 
-export async function readSessionUserId(
+export async function readSessionClaims(
   token: string | undefined,
-  secret: string | undefined
-): Promise<string | null> {
+  secret: string | undefined,
+  nowSec: number = Math.floor(Date.now() / 1000)
+): Promise<SessionClaims | null> {
   if (!token || !secret) return null;
   const dot = token.lastIndexOf(".");
   if (dot < 1) return null;
@@ -62,13 +93,44 @@ export async function readSessionUserId(
   const expected = await hmac(secret, payload);
   if (!timingSafeEqual(expected, sig)) return null;
   try {
-    const json = JSON.parse(new TextDecoder().decode(fromB64url(payload))) as { u?: string; e?: number };
+    const json = JSON.parse(new TextDecoder().decode(fromB64url(payload))) as {
+      u?: string;
+      e?: number;
+      i?: number;
+    };
     if (!json.u || typeof json.e !== "number") return null;
-    if (json.e < Date.now() / 1000) return null;
-    return json.u;
+    if (json.e < nowSec) return null;
+    return {
+      userId: json.u,
+      exp: json.e,
+      iat: typeof json.i === "number" ? json.i : 0,
+    };
   } catch {
     return null;
   }
+}
+
+export async function readSessionUserId(
+  token: string | undefined,
+  secret: string | undefined
+): Promise<string | null> {
+  const claims = await readSessionClaims(token, secret);
+  return claims?.userId ?? null;
+}
+
+/**
+ * HMAC-valid cookie that was issued before this user's last sign-out is
+ * unauthenticated. `loggedOutAtSec` comes from app_state (or a test stub).
+ */
+export async function authenticatedUserId(
+  token: string | undefined,
+  secret: string | undefined,
+  loggedOutAtSec: number | null | undefined,
+  nowSec?: number
+): Promise<string | null> {
+  const claims = await readSessionClaims(token, secret, nowSec);
+  if (!sessionActiveAfterLogout(claims, loggedOutAtSec)) return null;
+  return claims.userId;
 }
 
 export function sessionCookieOptions(secure: boolean) {
@@ -79,4 +141,40 @@ export function sessionCookieOptions(secure: boolean) {
     path: "/",
     maxAge: SESSION_MAX_AGE_SEC,
   };
+}
+
+export function expiredSessionCookieOptions(secure: boolean) {
+  return {
+    ...sessionCookieOptions(secure),
+    maxAge: 0,
+  };
+}
+
+/**
+ * Edge-safe lookup of the per-user logout stamp. Missing env or a failed
+ * fetch is treated as "never logged out" so a Supabase blip does not kick
+ * every visitor to /connect/. Sign-out still clears the browser cookie.
+ */
+export async function fetchLoggedOutAt(userId: string): Promise<number | null> {
+  const base = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!base || !key) return null;
+  const url = new URL(`${base.replace(/\/$/, "")}/rest/v1/app_state`);
+  url.searchParams.set("key", `eq.${sessionLogoutKey(userId)}`);
+  url.searchParams.set("select", "value");
+  try {
+    const res = await fetch(url, {
+      headers: {
+        apikey: key,
+        Authorization: `Bearer ${key}`,
+        Accept: "application/json",
+      },
+      cache: "no-store",
+    });
+    if (!res.ok) return null;
+    const rows = (await res.json()) as Array<{ value?: unknown }>;
+    return parseLogoutStamp(rows?.[0]?.value);
+  } catch {
+    return null;
+  }
 }

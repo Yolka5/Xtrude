@@ -74,8 +74,11 @@ async function networkFirst(request) {
   try {
     const response = await fetch(request);
     if (response && response.ok) {
-      const cache = await caches.open(CACHE);
-      cache.put(request, response.clone());
+      const cc = (response.headers.get("Cache-Control") || "").toLowerCase();
+      if (!cc.includes("no-store") && !cc.includes("no-cache")) {
+        const cache = await caches.open(CACHE);
+        cache.put(request, response.clone());
+      }
     }
     return response;
   } catch {
@@ -119,6 +122,14 @@ self.addEventListener("fetch", (event) => {
     return;
   }
   event.respondWith(staleWhileRevalidate(request));
+});
+
+self.addEventListener("message", (event) => {
+  if (event.data && event.data.type === "signout") {
+    event.waitUntil(
+      caches.keys().then((keys) => Promise.all(keys.filter((k) => String(k).startsWith("xtrude-")).map((k) => caches.delete(k))))
+    );
+  }
 });
 
 self.addEventListener("push", (event) => {

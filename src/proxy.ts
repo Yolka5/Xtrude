@@ -1,7 +1,12 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { getAuthSecret } from "@/lib/auth/secret";
-import { readSessionUserId, SESSION_COOKIE } from "@/lib/auth/session";
+import {
+  SESSION_COOKIE,
+  fetchLoggedOutAt,
+  readSessionClaims,
+  sessionActiveAfterLogout,
+} from "@/lib/auth/session";
 
 /**
  * next.config trailingSlash: true would 308 POST /api/webhooks/onshape to
@@ -18,7 +23,8 @@ import { readSessionUserId, SESSION_COOKIE } from "@/lib/auth/session";
  * Default is off so Yoni's account keeps working with the APP_USER_ID
  * fallback until OAuth is confirmed. Webhooks, crons, OAuth, and /admin
  * (the only liveness tripwire) stay reachable either way. A missing
- * session must redirect, never 500.
+ * session must redirect, never 500. A cookie that was valid before the
+ * user signed out is treated as logged-out, not as a live session.
  */
 
 export function isPublicPath(pathname: string): boolean {
@@ -36,7 +42,16 @@ export function isPublicPath(pathname: string): boolean {
   return false;
 }
 
-export async function proxy(request: NextRequest) {
+export type ProxyDeps = {
+  loggedOutAt?: (userId: string) => Promise<number | null>;
+};
+
+function noStore(res: NextResponse) {
+  res.headers.set("Cache-Control", "private, no-store, max-age=0");
+  return res;
+}
+
+export async function proxy(request: NextRequest, deps: ProxyDeps = {}) {
   const { pathname } = request.nextUrl;
 
   if (pathname.startsWith("/_next") || pathname.includes(".")) {
@@ -46,10 +61,12 @@ export async function proxy(request: NextRequest) {
   if (process.env.REQUIRE_AUTH === "1" && !isPublicPath(pathname)) {
     let userId: string | null = null;
     try {
-      userId = await readSessionUserId(
-        request.cookies.get(SESSION_COOKIE)?.value,
-        getAuthSecret()
-      );
+      const claims = await readSessionClaims(request.cookies.get(SESSION_COOKIE)?.value, getAuthSecret());
+      if (claims) {
+        const lookup = deps.loggedOutAt ?? fetchLoggedOutAt;
+        const loggedOutAt = await lookup(claims.userId);
+        if (sessionActiveAfterLogout(claims, loggedOutAt)) userId = claims.userId;
+      }
     } catch {
       userId = null;
     }
@@ -57,15 +74,17 @@ export async function proxy(request: NextRequest) {
       const url = request.nextUrl.clone();
       url.pathname = "/connect/";
       url.search = "";
-      return NextResponse.redirect(url);
+      return noStore(NextResponse.redirect(url));
     }
   }
 
   if (pathname !== "/" && !pathname.endsWith("/")) {
     const url = request.nextUrl.clone();
     url.pathname = `${pathname}/`;
-    return NextResponse.rewrite(url);
+    return noStore(NextResponse.rewrite(url));
   }
 
-  return NextResponse.next();
+  const next = NextResponse.next();
+  if (!isPublicPath(pathname)) return noStore(next);
+  return next;
 }
