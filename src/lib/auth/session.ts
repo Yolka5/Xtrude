@@ -129,7 +129,7 @@ export async function authenticatedUserId(
   nowSec?: number
 ): Promise<string | null> {
   const claims = await readSessionClaims(token, secret, nowSec);
-  if (!sessionActiveAfterLogout(claims, loggedOutAtSec)) return null;
+  if (!claims || !sessionActiveAfterLogout(claims, loggedOutAtSec)) return null;
   return claims.userId;
 }
 
