@@ -11,5 +11,5 @@ export interface RebuildResult {
 
 export declare function rebuildSessions(
   supabase: unknown,
-  opts?: { excludeLiveTail?: boolean; now?: Date }
+  opts: { userId: string; excludeLiveTail?: boolean; now?: Date }
 ): Promise<RebuildResult>;

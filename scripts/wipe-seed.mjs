@@ -18,7 +18,7 @@
  */
 import { loadEnv, requireEnv } from "./lib/env.mjs";
 import { createClient } from "@supabase/supabase-js";
-import { APP_USER_ID } from "./lib/appUser.mjs";
+import { API_KEY_OWNER_ID } from "./lib/appUser.mjs";
 
 loadEnv();
 
@@ -32,13 +32,13 @@ function section(title) {
 }
 
 async function count(supabase, table) {
-  const { count, error } = await supabase.from(table).select("*", { count: "exact", head: true }).eq("user_id", APP_USER_ID);
+  const { count, error } = await supabase.from(table).select("*", { count: "exact", head: true }).eq("user_id", API_KEY_OWNER_ID);
   if (error) throw new Error(`counting ${table}: ${error.message}`);
   return count ?? 0;
 }
 
 async function wipe(supabase, table) {
-  const { error } = await supabase.from(table).delete().eq("user_id", APP_USER_ID);
+  const { error } = await supabase.from(table).delete().eq("user_id", API_KEY_OWNER_ID);
   if (error) throw new Error(`deleting from ${table}: ${error.message}`);
 }
 

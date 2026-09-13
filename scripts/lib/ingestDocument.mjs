@@ -1,4 +1,4 @@
-import { APP_USER_ID } from "./appUser.mjs";
+import { authoredBy, requireUserId } from "./userScope.mjs";
 
 /**
  * One documenthistory pull → `events` upsert. Used by the dirty-document
@@ -7,9 +7,17 @@ import { APP_USER_ID } from "./appUser.mjs";
  * Costs exactly one Onshape API call (`fetchDocumentHistory`). The 50-row
  * ceiling still applies, but a brand-new document is well under that, so
  * first discovery recovers the whole pre-webhook history.
+ *
+ * documenthistory on a shared document returns every collaborator's
+ * microversions. Only rows authored by `authorOnshapeId` become this user's
+ * events: a teammate's edit belongs to the teammate, not to everyone who
+ * happens to track the same document.
  */
-export function eventRowsFromHistory(documentId, history, userId = APP_USER_ID) {
+export function eventRowsFromHistory(documentId, history, userId, authorOnshapeId) {
+  requireUserId(userId, "eventRowsFromHistory");
+  if (!authorOnshapeId) throw new Error("eventRowsFromHistory: authorOnshapeId is required");
   return (history.rows ?? [])
+    .filter((row) => authoredBy(row, authorOnshapeId))
     .map((row) => {
       const microversionId = row.microversionId ?? row.id ?? row.microversion;
       const occurredAt = row.date ?? row.createdAt ?? row.time;
@@ -29,12 +37,15 @@ export function eventRowsFromHistory(documentId, history, userId = APP_USER_ID) 
 /**
  * @param {*} supabase
  * @param {*} onshape
- * @param {{ id: string, onshape_document_id: string, onshape_workspace_id: string }} doc
- * @param {{ markBackfilled?: boolean, now?: Date }} [opts]
+ * @param {{ id: string, onshape_document_id: string, onshape_workspace_id: string, user_id: string }} doc
+ * @param {{ markBackfilled?: boolean, now?: Date, authorOnshapeId: string }} opts
  */
-export async function ingestDocumentHistory(supabase, onshape, doc, { markBackfilled = false, now = new Date() } = {}) {
+export async function ingestDocumentHistory(supabase, onshape, doc, { markBackfilled = false, now = new Date(), authorOnshapeId } = {}) {
+  const userId = requireUserId(doc?.user_id, "ingestDocumentHistory");
+  if (!authorOnshapeId) throw new Error("ingestDocumentHistory: authorOnshapeId is required");
+
   const history = await onshape.fetchDocumentHistory(doc.onshape_document_id, doc.onshape_workspace_id);
-  const eventRows = eventRowsFromHistory(doc.id, history, doc.user_id ?? APP_USER_ID);
+  const eventRows = eventRowsFromHistory(doc.id, history, userId, authorOnshapeId);
 
   if (eventRows.length > 0) {
     const { error: insertErr } = await supabase
@@ -45,7 +56,7 @@ export async function ingestDocumentHistory(supabase, onshape, doc, { markBackfi
 
   const patch = { last_synced_at: now.toISOString() };
   if (markBackfilled) patch.last_backfilled_at = now.toISOString();
-  const { error: updateErr } = await supabase.from("tracked_documents").update(patch).eq("id", doc.id).eq("user_id", doc.user_id ?? APP_USER_ID);
+  const { error: updateErr } = await supabase.from("tracked_documents").update(patch).eq("id", doc.id).eq("user_id", userId);
   if (updateErr) throw new Error(`updating tracked_documents: ${updateErr.message}`);
 
   return {

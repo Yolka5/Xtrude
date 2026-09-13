@@ -1,11 +1,10 @@
 import "server-only";
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { makeClient, rebuildSessions } from "@/lib/onshapeRuntime";
+import { rebuildSessions } from "@/lib/onshapeRuntime";
 import { snapshotStreak } from "../../../../../scripts/lib/streakSnapshot.mjs";
 import { requireEnv } from "@/lib/env";
 import { cronAuthorized, unauthorizedCron } from "@/lib/cronAuth";
-import { APP_USER_ID } from "../../../../../scripts/lib/appUser.mjs";
 import { maybeSendPushReminders } from "@/lib/push/reminders";
 import { discoveryDue } from "@/lib/discoverySchedule";
 import {
@@ -14,7 +13,7 @@ import {
   lastDiscoveredAtFromValue,
   stampUserDiscovered,
 } from "@/lib/discoverDocuments";
-import { getValidAccessToken, userNeedsReauth } from "@/lib/auth/tokens";
+import { onshapeClientForUser } from "@/lib/onshapeForUser";
 import { createCallBudget, isBudgetExceeded, maxCallsPerRun } from "../../../../../scripts/lib/callBudget.mjs";
 
 export const dynamic = "force-dynamic";
@@ -33,7 +32,7 @@ export const maxDuration = 60;
  *
  * Session rebuild + streak snapshot run for every user every night (DB
  * only). Onshape list/history/webhook calls run only for users who are due
- * and who have credentials.
+ * and who have credentials of their own.
  */
 
 type UserLog = {
@@ -48,17 +47,6 @@ type UserLog = {
   webhooksRegistered: number;
   callsUsed: number;
 };
-
-function makeOnshapeForUser(userId: string, budget: ReturnType<typeof createCallBudget>) {
-  if (userId === APP_USER_ID && process.env.ONSHAPE_ACCESS_KEY && process.env.ONSHAPE_SECRET_KEY) {
-    return makeClient({
-      accessKey: process.env.ONSHAPE_ACCESS_KEY,
-      secretKey: process.env.ONSHAPE_SECRET_KEY,
-      budget,
-    });
-  }
-  return null;
-}
 
 async function handle(req: NextRequest) {
   if (!cronAuthorized(req)) return unauthorizedCron();
@@ -134,24 +122,14 @@ async function handle(req: NextRequest) {
       continue;
     }
 
-    if (await userNeedsReauth(userId)) {
+    const credentials = await onshapeClientForUser(userId, budget);
+    if (credentials.client === null) {
       log.skipped = true;
-      log.reason = "due but needs Onshape reauth";
+      log.reason = credentials.reason === "needs_reauth" ? "due but needs Onshape reauth" : "due but no oauth token";
       summary.users.push(log);
       continue;
     }
-
-    let onshape = makeOnshapeForUser(userId, budget);
-    if (!onshape) {
-      const token = await getValidAccessToken(userId);
-      if (!token) {
-        log.skipped = true;
-        log.reason = "due but no oauth token";
-        summary.users.push(log);
-        continue;
-      }
-      onshape = makeClient({ accessToken: token, budget });
-    }
+    const onshape = credentials.client;
 
     const startedCalls = onshape.callsUsed();
     try {
@@ -187,25 +165,27 @@ async function handle(req: NextRequest) {
 
   summary.budget = budget.snapshot();
 
-  try {
-    const rollups = [];
-    const streaks = [];
-    for (const user of users) {
-      const userId = user.id as string;
+  // Every user separately, so one account that cannot rebuild never stops
+  // the others' sessions and streaks from updating.
+  const rollups: unknown[] = [];
+  const streaks: unknown[] = [];
+  for (const user of users) {
+    const userId = user.id as string;
+    try {
       rollups.push(await rebuildSessions(supabase, { excludeLiveTail: true, now, userId }));
       streaks.push(await snapshotStreak(supabase, now, userId));
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      summary.errors.push(`rollup ${userId}: ${message}`);
     }
-    summary.rollup = rollups[0] ?? null;
-    summary.streak = streaks[0] ?? null;
-    await supabase.from("app_state").upsert({
-      key: "last_rollup",
-      value: { rollup: summary.rollup, streak: summary.streak, users: users.length },
-      updated_at: now.toISOString(),
-    });
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    summary.errors.push(`rollup: ${message}`);
   }
+  summary.rollup = rollups[0] ?? null;
+  summary.streak = streaks[0] ?? null;
+  await supabase.from("app_state").upsert({
+    key: "last_rollup",
+    value: { rollup: summary.rollup, streak: summary.streak, users: users.length },
+    updated_at: now.toISOString(),
+  });
 
   try {
     (summary as { push?: unknown }).push = await maybeSendPushReminders(now);

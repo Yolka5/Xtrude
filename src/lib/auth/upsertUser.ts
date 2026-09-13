@@ -23,11 +23,8 @@ export async function upsertUserFromOnshape(info: OnshapeSessionInfo): Promise<{
   const users = (rows ?? []) as BoundUser[];
   const plan = planOnshapeLogin(onshapeId, users);
   if (plan.action === "reuse") {
-    const { error: updateErr } = await sb
-      .from("users")
-      .update({ display_name: name, initials })
-      .eq("id", plan.userId);
-    if (updateErr) throw new Error(`updating user: ${updateErr.message}`);
+    // An existing account keeps the name its owner set on Profile. Onshape's
+    // name only seeds a brand-new row; logging in again must not reset it.
     return { id: plan.userId, created: false };
   }
 

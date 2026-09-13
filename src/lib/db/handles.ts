@@ -1,11 +1,10 @@
 import "server-only";
 import { getSupabase } from "./client";
+import { claimAvailableHandleIn, claimHandleIn, type HandleStore } from "@/lib/handleClaim";
 import {
-  handleCandidateAt,
   handleStemFromIdentity,
   handleTakenKey,
   handleUserKey,
-  planHandleClaim,
   sanitizeHandle,
   type HandleIdentity,
 } from "@/lib/profileFields";
@@ -36,65 +35,60 @@ export async function getHandleForUser(userId: string): Promise<string | null> {
   return typeof raw === "string" ? sanitizeHandle(raw) : null;
 }
 
-async function takenBy(handle: string): Promise<string | null> {
-  const { data } = await getSupabase()
-    .from("app_state")
-    .select("value")
-    .eq("key", handleTakenKey(handle))
-    .maybeSingle();
-  const userId = (data?.value as { userId?: unknown } | null)?.userId;
-  return typeof userId === "string" && userId.length > 0 ? userId : null;
+/**
+ * A fresh signal opts a read out of Next's per-render GET memoization, so
+ * it reflects writes made earlier in the same render.
+ */
+function unmemoized(): AbortSignal {
+  return new AbortController().signal;
 }
+
+const store: HandleStore = {
+  async reserve(handle, userId) {
+    const { error } = await getSupabase()
+      .from("app_state")
+      .insert({ key: handleTakenKey(handle), value: { userId }, updated_at: new Date().toISOString() });
+    if (!error) return "ok";
+    if (error.code === "23505") return "conflict";
+    throw new Error(error.message);
+  },
+  async ownerOf(handle) {
+    const { data, error } = await getSupabase()
+      .from("app_state")
+      .select("value")
+      .eq("key", handleTakenKey(handle))
+      .abortSignal(unmemoized())
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    const userId = (data?.value as { userId?: unknown } | null)?.userId;
+    return typeof userId === "string" && userId.length > 0 ? userId : null;
+  },
+  async currentHandle(userId) {
+    const { data, error } = await getSupabase()
+      .from("app_state")
+      .select("value")
+      .eq("key", handleUserKey(userId))
+      .abortSignal(unmemoized())
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    const raw = (data?.value as { handle?: unknown } | null)?.handle;
+    return typeof raw === "string" ? sanitizeHandle(raw) : null;
+  },
+  async setCurrentHandle(userId, handle) {
+    const { error } = await getSupabase().from("app_state").upsert({
+      key: handleUserKey(userId),
+      value: { handle },
+      updated_at: new Date().toISOString(),
+    });
+    if (error) throw new Error(error.message);
+  },
+  async release(handle, userId) {
+    await getSupabase().from("app_state").delete().eq("key", handleTakenKey(handle)).eq("value->>userId", userId);
+  },
+};
 
 export async function claimHandle(userId: string, raw: string): Promise<{ handle: string }> {
-  const preview = planHandleClaim({ userId, raw, takenBy: null });
-  if (!preview.ok) throw new Error(preview.reason);
-  const owner = await takenBy(preview.handle);
-  const planned = planHandleClaim({ userId, raw, takenBy: owner });
-  if (!planned.ok) throw new Error(planned.reason);
-
-  const previous = await getHandleForUser(userId);
-  const now = new Date().toISOString();
-  const sb = getSupabase();
-
-  if (previous && previous !== planned.handle) {
-    await sb.from("app_state").delete().eq("key", handleTakenKey(previous));
-  }
-
-  const { error: takenErr } = await sb.from("app_state").upsert({
-    key: handleTakenKey(planned.handle),
-    value: { userId },
-    updated_at: now,
-  });
-  if (takenErr) throw new Error(takenErr.message);
-
-  const confirm = await takenBy(planned.handle);
-  if (confirm !== userId) {
-    throw new Error("That @ is taken.");
-  }
-
-  const { error: userErr } = await sb.from("app_state").upsert({
-    key: handleUserKey(userId),
-    value: { handle: planned.handle },
-    updated_at: now,
-  });
-  if (userErr) throw new Error(userErr.message);
-  return { handle: planned.handle };
-}
-
-export async function claimAvailableHandle(userId: string, stem: string): Promise<string | null> {
-  for (let attempt = 0; attempt < 20; attempt++) {
-    const candidate = handleCandidateAt(stem, attempt);
-    if (!candidate) continue;
-    try {
-      const claimed = await claimHandle(userId, candidate);
-      return claimed.handle;
-    } catch (err) {
-      if (err instanceof Error && err.message === "That @ is taken.") continue;
-      throw err;
-    }
-  }
-  return null;
+  return claimHandleIn(store, userId, raw);
 }
 
 /** Give this account its own @ from Onshape / display name if it has none yet. */
@@ -115,5 +109,12 @@ export async function ensureHandleForUser(userId: string, identity?: HandleIdent
 
   const stem = handleStemFromIdentity(info ?? {});
   if (!stem) return null;
-  return claimAvailableHandle(userId, stem);
+  try {
+    return await claimAvailableHandleIn(store, userId, stem);
+  } catch (err) {
+    // A failed automatic claim sends the person to /welcome to pick one,
+    // never onto a page with a 500 or someone else's @.
+    console.error("automatic @ claim failed:", err instanceof Error ? err.message : err);
+    return null;
+  }
 }

@@ -20,7 +20,8 @@
 import { loadEnv, requireEnv } from "./lib/env.mjs";
 import { makeClient } from "./lib/onshape.mjs";
 import { createClient } from "@supabase/supabase-js";
-import { APP_USER_ID } from "./lib/appUser.mjs";
+import { API_KEY_OWNER_ID } from "./lib/appUser.mjs";
+import { eventRowsFromHistory } from "./lib/ingestDocument.mjs";
 import { isBudgetExceeded, maxCallsPerRun } from "./lib/callBudget.mjs";
 
 loadEnv();
@@ -47,6 +48,7 @@ async function main() {
 
   section("1. AUTH");
   const who = await onshape.whoAmI();
+  if (!who.id) throw new Error("whoAmI returned no Onshape user id, so edits cannot be attributed to anyone.");
   console.log(`Authenticated as : ${who.name ?? "?"}`);
   console.log(`Onshape user id  : ${who.id ?? "?"}`);
   console.log(`Call budget      : ${MAX_CALLS} (${onshape.callsUsed()} used so far)`);
@@ -135,7 +137,7 @@ async function main() {
       .from("tracked_documents")
       .upsert(
         {
-          user_id: APP_USER_ID,
+          user_id: API_KEY_OWNER_ID,
           onshape_document_id: doc.id,
           onshape_workspace_id: workspaceId,
           name: doc.name,
@@ -152,21 +154,9 @@ async function main() {
       continue;
     }
 
-    const eventRows = history.rows
-      .map((row) => {
-        const microversionId = row.microversionId ?? row.id ?? row.microversion;
-        const occurredAt = row.date ?? row.createdAt ?? row.time;
-        if (!microversionId || !occurredAt) return null;
-        return {
-          user_id: APP_USER_ID,
-          document_id: trackedDoc.id,
-          element_id: row.elementId ?? row.element ?? null,
-          microversion_id: String(microversionId),
-          occurred_at: new Date(occurredAt).toISOString(),
-          raw: row,
-        };
-      })
-      .filter(Boolean);
+    // Only this account's own edits: a shared document's history lists
+    // every collaborator's microversions.
+    const eventRows = eventRowsFromHistory(trackedDoc.id, history, API_KEY_OWNER_ID, who.id);
 
     const CHUNK = 500;
     let chunkFailed = false;
@@ -188,7 +178,7 @@ async function main() {
     const { count: totalForDoc } = await supabase
       .from("events")
       .select("*", { count: "exact", head: true })
-      .eq("user_id", APP_USER_ID)
+      .eq("user_id", API_KEY_OWNER_ID)
       .eq("document_id", trackedDoc.id);
 
     console.log(

@@ -16,9 +16,10 @@ export function makeClient(opts: {
   return makeClientImpl(opts as never);
 }
 
+/** One named user's rebuild. There is no default user. */
 export function rebuildSessions(
   supabase: unknown,
-  opts?: { excludeLiveTail?: boolean; now?: Date; userId?: string }
+  opts: { userId: string; excludeLiveTail?: boolean; now?: Date }
 ) {
-  return rebuildSessionsImpl(supabase, opts as never);
+  return rebuildSessionsImpl(supabase, opts);
 }

@@ -23,7 +23,7 @@ export const AVATAR_COLORS = [
 
 export const DEFAULT_LOCAL_PROFILE: LocalProfile = {
   displayName: "You",
-  initials: "YS",
+  initials: "?",
   avatarColor: AVATAR_COLORS[0].hex,
 };
 

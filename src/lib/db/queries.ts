@@ -4,6 +4,7 @@ import { deriveRealData, type RealData } from "./derive";
 import { getCurrentUserId } from "@/lib/auth/currentUser";
 import { assembleSessionDocuments, sessionQualification, type SessionDocCount } from "@/lib/sessionDetail";
 import { calendarDateInZone, clockHmInZone } from "../../../scripts/lib/timezone.mjs";
+import { lastSyncKey } from "../../../scripts/lib/userScope.mjs";
 import { storedOnshapeImageUrl } from "@/lib/auth/tokens";
 import { memberSinceLabel, sanitizeDisplayName } from "@/lib/profileFields";
 import { initialsFromDisplayName } from "@/lib/localProfile";
@@ -55,14 +56,15 @@ export async function hasOnshapeBinding(): Promise<boolean> {
   }
 }
 
-/** `app_state.last_sync.updated_at`, or null if it has never run. Used by
- * Today to decide whether to fire a background sync without blocking render. */
-export async function getLastSyncAt(): Promise<number | null> {
+/** When this user's own documents last synced, or null if never. Used by
+ * Today to decide whether to fire a background sync without blocking
+ * render. Per user: another account's sync says nothing about yours. */
+export async function getLastSyncAt(userId: string): Promise<number | null> {
   try {
     const { data, error } = await getSupabase()
       .from("app_state")
       .select("updated_at")
-      .eq("key", "last_sync")
+      .eq("key", lastSyncKey(userId))
       .maybeSingle();
     if (error || !data?.updated_at) return null;
     const ms = Date.parse(data.updated_at as string);

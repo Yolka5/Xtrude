@@ -1,36 +1,48 @@
 /**
- * The one Onshape-read path for live capture: documents the webhook
- * endpoint flagged dirty (`last_notified_at` newer than `last_synced_at`)
- * get one documenthistory pull each, then sessions/daily_stats are rebuilt
- * with the still-editing tail excluded.
+ * The one Onshape-read path for live capture, for exactly one user: that
+ * user's documents the webhook endpoint flagged dirty (`last_notified_at`
+ * newer than `last_synced_at`) get one documenthistory pull each, then that
+ * user's sessions/daily_stats are rebuilt with the still-editing tail
+ * excluded.
  *
  * Called from:
- *   - POST /api/sync (Today page load, 15-minute throttle lives in the route)
- *   - GET/POST /api/cron/sync (GitHub Actions hourly backstop, CRON_SECRET)
+ *   - POST /api/sync (Today page load: the signed-in viewer only, per-user
+ *     15-minute throttle lives in the route)
+ *   - GET/POST /api/cron/sync (GitHub Actions hourly: every user in turn,
+ *     one call budget shared across them)
  *
  * Never called from the webhook handler itself - that handler only stamps
  * last_notified_at, so a burst of deliveries costs zero Onshape calls.
+ *
+ * `getClient` must resolve to `{ client }` acting as *this* user (their own
+ * OAuth token, or the server API keys only for the account that owns them)
+ * built on `budget`, or `{ client: null, reason }` to skip. It is only
+ * called when something is dirty, so a clean user costs no token refresh
+ * and no Onshape call.
  */
-import { makeClient } from "./onshape.mjs";
 import { rebuildSessions } from "./sessionRebuild.mjs";
 import { ingestDocumentHistory } from "./ingestDocument.mjs";
-import { APP_USER_ID } from "./appUser.mjs";
-import { createCallBudget, isBudgetExceeded, maxCallsPerRun } from "./callBudget.mjs";
+import { isBudgetExceeded } from "./callBudget.mjs";
+import { loadOnshapeUserId, requireUserId } from "./userScope.mjs";
 
 export const MAX_SYNC_ONSHAPE_CALLS = 20;
 
 /**
  * @param {*} supabase
- * @param {{ accessKey: string, secretKey: string, now?: Date, trigger?: string, maxCalls?: number }} opts
+ * @param {{ userId: string, getClient: () => Promise<{ client: any, reason?: string }>, budget: any, now?: Date, trigger?: string }} opts
  */
-export async function runDirtySync(supabase, { accessKey, secretKey, now = new Date(), trigger = "cron", maxCalls } = {}) {
-  const budget = createCallBudget(maxCalls ?? maxCallsPerRun());
+export async function runDirtySync(supabase, { userId, getClient, budget, now = new Date(), trigger = "cron" } = {}) {
+  requireUserId(userId, "runDirtySync");
+  if (!budget) throw new Error("runDirtySync: budget is required");
+  const startCalls = budget.callsUsed();
   const summary = {
     at: now.toISOString(),
     trigger,
+    userId,
     documentsChecked: 0,
     documentsSynced: 0,
     eventsWritten: 0,
+    skippedReason: null,
     errors: [],
     rebuild: null,
     callsUsed: 0,
@@ -40,7 +52,7 @@ export async function runDirtySync(supabase, { accessKey, secretKey, now = new D
   const { data: dirtyDocs, error: dirtyErr } = await supabase
     .from("tracked_documents")
     .select("id, onshape_document_id, onshape_workspace_id, name, last_notified_at, last_synced_at, user_id")
-    .eq("user_id", APP_USER_ID)
+    .eq("user_id", userId)
     .not("last_notified_at", "is", null);
   if (dirtyErr) throw new Error(`load_failed: ${dirtyErr.message}`);
 
@@ -50,44 +62,40 @@ export async function runDirtySync(supabase, { accessKey, secretKey, now = new D
   summary.documentsChecked = toSync.length;
 
   if (toSync.length > 0) {
-    const onshape = makeClient({
-      accessKey,
-      secretKey,
-      budget,
-    });
-
-    for (const doc of toSync) {
-      if (budget.remaining() < 1) {
-        summary.errors.push(
-          `stopped at cap (${budget.callsUsed()}/${budget.maxCalls}) before ${doc.name}`
-        );
-        break;
-      }
-      try {
-        const ingested = await ingestDocumentHistory(supabase, onshape, doc, { now });
-        summary.documentsSynced++;
-        summary.eventsWritten += ingested.eventsWritten;
-      } catch (err) {
-        if (isBudgetExceeded(err)) {
-          summary.errors.push(err instanceof Error ? err.message : String(err));
+    const authorOnshapeId = await loadOnshapeUserId(supabase, userId);
+    const { client: onshape, reason } = (await getClient()) ?? { client: null };
+    if (!onshape) {
+      summary.skippedReason = reason ?? "no_onshape_credentials";
+    } else {
+      for (const doc of toSync) {
+        if (budget.remaining() < 1) {
+          summary.errors.push(`stopped at cap (${budget.callsUsed()}/${budget.maxCalls}) before ${doc.name}`);
           break;
         }
-        const message = err instanceof Error ? err.message : String(err);
-        summary.errors.push(`${doc.name}: ${message}`);
+        try {
+          const ingested = await ingestDocumentHistory(supabase, onshape, doc, { now, authorOnshapeId });
+          summary.documentsSynced++;
+          summary.eventsWritten += ingested.eventsWritten;
+        } catch (err) {
+          const message = err instanceof Error ? err.message : String(err);
+          if (isBudgetExceeded(err)) {
+            summary.errors.push(message);
+            break;
+          }
+          summary.errors.push(`${doc.name}: ${message}`);
+        }
       }
     }
-    summary.callsUsed = budget.callsUsed();
   }
 
+  summary.callsUsed = budget.callsUsed() - startCalls;
   summary.budget = budget.snapshot();
 
   try {
-    summary.rebuild = await rebuildSessions(supabase, { excludeLiveTail: true, now });
+    summary.rebuild = await rebuildSessions(supabase, { excludeLiveTail: true, now, userId });
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    summary.errors.push(`rebuildSessions: ${message}`);
+    summary.errors.push(`rebuildSessions: ${err instanceof Error ? err.message : String(err)}`);
   }
 
-  await supabase.from("app_state").upsert({ key: "last_sync", value: summary, updated_at: now.toISOString() });
   return summary;
 }

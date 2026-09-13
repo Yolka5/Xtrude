@@ -1,6 +1,7 @@
 import "server-only";
 import { makeClient, rebuildSessions } from "@/lib/onshapeRuntime";
 import { ingestDocumentHistory } from "../../scripts/lib/ingestDocument.mjs";
+import { loadOnshapeUserId } from "../../scripts/lib/userScope.mjs";
 import { getSupabase } from "@/lib/db/client";
 import { getValidAccessToken } from "@/lib/auth/tokens";
 import { requireEnv } from "@/lib/env";
@@ -52,6 +53,7 @@ export async function onboardUser(userId: string): Promise<OnboardSummary> {
 
   const webhookUrl = requireEnv("WEBHOOK_URL");
   const supabase = getSupabase();
+  const authorOnshapeId = await loadOnshapeUserId(supabase, userId);
   const onshape = makeClient({ accessToken, maxCalls: Math.min(ONBOARD_MAX_CALLS, maxCallsPerRun()) });
   const now = new Date();
 
@@ -73,7 +75,7 @@ export async function onboardUser(userId: string): Promise<OnboardSummary> {
       if (insertErr) throw new Error(insertErr.message);
       summary.documentsAdded++;
 
-      const ingested = await ingestDocumentHistory(supabase, onshape, inserted, { markBackfilled: true, now });
+      const ingested = await ingestDocumentHistory(supabase, onshape, inserted, { markBackfilled: true, now, authorOnshapeId });
       summary.historiesPulled++;
       summary.eventsWritten += ingested.eventsWritten;
 

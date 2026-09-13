@@ -187,7 +187,7 @@ export function deriveRealData(
   const profile: ProfileStats = {
     name: "You",
     handle: "",
-    initials: "YS",
+    initials: "",
     memberSince,
     lifetimeMinutes,
     lifetimeHours: Math.round((lifetimeMinutes / 60) * 10) / 10,

@@ -1,7 +1,6 @@
 import "server-only";
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabase } from "@/lib/db/client";
-import { APP_USER_ID } from "../../../../../scripts/lib/appUser.mjs";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -43,7 +42,9 @@ async function logDelivery(params: {
   ip: string | null;
 }) {
   const { error } = await getSupabase().from("webhook_deliveries").insert({
-    user_id: params.userId || APP_USER_ID,
+    // An attempt we cannot tie to one of our registrations logs with no
+    // user - never filed under someone's account.
+    user_id: params.userId ?? null,
     onshape_webhook_id: params.webhookId,
     event: params.event,
     document_id: params.documentId,

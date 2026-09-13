@@ -2,18 +2,24 @@
  * Shared session-rebuild logic: `events` in, `sessions`/`daily_stats`
  * wiped and rebuilt in Supabase. Used by both `npm run recompute-sessions`
  * (a manual, one-off full recompute - always finalizes every cluster) and
- * the hourly sync cron (`excludeLiveTail: true`), which must NOT finalize
- * a cluster that's still within the idle window: the user might still be
- * editing, and closing it early would credit a session that hasn't
+ * the sync/discovery crons (`excludeLiveTail: true`), which must NOT
+ * finalize a cluster that's still within the idle window: the user might
+ * still be editing, and closing it early would credit a session that hasn't
  * actually ended yet, then have to un-write it next hour.
  *
- * Always a full wipe-and-rebuild for this user rather than an incremental
- * merge. Defaults to APP_USER_ID so existing crons stay scoped to Yoni;
- * onboarding passes the new user's id so we never wipe someone else's rows.
+ * Always a full wipe-and-rebuild for exactly one user rather than an
+ * incremental merge. `userId` is required - there is no default account,
+ * so a missing id throws before anything is read or wiped.
+ *
+ * Every stored event for that user counts. Ingestion now keeps only the
+ * user's own edits (see ingestDocument.mjs), so new history is theirs
+ * alone. Events stored before that change - which on shared documents
+ * include teammates' edits - are deliberately left in place, so existing
+ * totals do not move when this rebuild runs.
  */
 import { clusterSessions, IDLE_THRESHOLD_MINUTES } from "./sessionAlgorithm.mjs";
 import { calendarDateInZone } from "./timezone.mjs";
-import { APP_USER_ID } from "./appUser.mjs";
+import { requireUserId } from "./userScope.mjs";
 
 async function fetchAllEvents(supabase, userId) {
   const PAGE = 1000;
@@ -40,11 +46,12 @@ async function fetchAllEvents(supabase, userId) {
 
 /**
  * @param {*} supabase
- * @param {{ excludeLiveTail?: boolean, now?: Date, userId?: string }} [opts]
+ * @param {{ userId: string, excludeLiveTail?: boolean, now?: Date }} opts
  * @returns {Promise<{ sessionsWritten: number, activeDays: number, dropped: number, excludedLiveTail: boolean }>}
  */
 export async function rebuildSessions(supabase, opts = {}) {
-  const { excludeLiveTail = false, now = new Date(), userId = APP_USER_ID } = opts;
+  const { excludeLiveTail = false, now = new Date(), userId } = opts;
+  requireUserId(userId, "rebuildSessions");
   const events = await fetchAllEvents(supabase, userId);
 
   let clusters = events.length ? clusterSessions(events) : [];

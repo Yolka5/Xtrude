@@ -21,10 +21,10 @@ export default async function TodayScreen({
 }: {
   searchParams: Promise<{ onboarded?: string }>;
 }) {
-  await requireAppUser();
+  const userId = await requireAppUser();
   const [{ today, todayStats, streak, week, sessions, hasAnyData }, lastSyncAt, params, onshapeConnected] = await Promise.all([
     getRealData(),
-    getLastSyncAt(),
+    getLastSyncAt(userId),
     searchParams,
     hasOnshapeBinding(),
   ]);

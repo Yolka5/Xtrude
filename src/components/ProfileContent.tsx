@@ -17,6 +17,37 @@ import { NotificationSettings } from "@/components/NotificationSettings";
 
 const PRISM_CONFETTI = ["#9e74e7", "#f04cf0", "#ff52a8"];
 
+/** Sign-out leaves nothing of this account behind on the device: its push
+ *  subscription (or whoever signs in here next would get this account's
+ *  streak and league pushes), its per-tab celebration and rank memory, and
+ *  the offline page cache. Best-effort and time-boxed so it never holds up
+ *  the sign-out itself. */
+async function forgetAccountOnThisDevice() {
+  try {
+    window.sessionStorage.removeItem("xtrude.profileUnlocks");
+    window.sessionStorage.removeItem("xtrude.leagueRank");
+  } catch {
+    /* storage can be unavailable */
+  }
+  try {
+    navigator.serviceWorker?.controller?.postMessage({ type: "signout" });
+  } catch {
+    /* cache clear is best-effort */
+  }
+  const unsubscribe = (async () => {
+    const reg = await navigator.serviceWorker?.getRegistration();
+    const sub = await reg?.pushManager?.getSubscription();
+    if (!sub) return;
+    await fetch("/api/push/subscribe/", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ endpoint: sub.endpoint }),
+    });
+    await sub.unsubscribe();
+  })().catch(() => {});
+  await Promise.race([unsubscribe, new Promise((resolve) => window.setTimeout(resolve, 1500))]);
+}
+
 /** "Personal record or badge: full-screen confetti" - there's no live unlock
  *  event in a static-fixture app, so earned badges and records are tappable
  *  celebrations instead: "these should feel good enough that I want to
@@ -225,12 +256,10 @@ export function ProfileContent({
           action="/api/auth/logout"
           method="POST"
           style={{ margin: "20px 0 0", textAlign: "center" }}
-          onSubmit={() => {
-            try {
-              navigator.serviceWorker?.controller?.postMessage({ type: "signout" });
-            } catch {
-              /* cache clear is best-effort */
-            }
+          onSubmit={(e) => {
+            e.preventDefault();
+            const form = e.currentTarget;
+            void forgetAccountOnThisDevice().finally(() => form.submit());
           }}
         >
           <button type="submit" className="text-btn">

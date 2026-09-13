@@ -21,7 +21,7 @@
 import { loadEnv, requireEnv } from "./lib/env.mjs";
 import { makeClient } from "./lib/onshape.mjs";
 import { createClient } from "@supabase/supabase-js";
-import { APP_USER_ID } from "./lib/appUser.mjs";
+import { API_KEY_OWNER_ID } from "./lib/appUser.mjs";
 import { maxCallsPerRun } from "./lib/callBudget.mjs";
 
 loadEnv();
@@ -61,7 +61,7 @@ async function cmdRegister(onlyDocumentId) {
   const supabase = makeSupabase();
 
   section("1. TRACKED DOCUMENTS");
-  let query = supabase.from("tracked_documents").select("id, onshape_document_id, onshape_workspace_id, name").eq("user_id", APP_USER_ID);
+  let query = supabase.from("tracked_documents").select("id, onshape_document_id, onshape_workspace_id, name").eq("user_id", API_KEY_OWNER_ID);
   if (onlyDocumentId) query = query.eq("onshape_document_id", onlyDocumentId);
   const { data: docs, error: docsErr } = await query;
   if (docsErr) throw new Error(`loading tracked_documents: ${docsErr.message}`);
@@ -75,7 +75,7 @@ async function cmdRegister(onlyDocumentId) {
   const { data: existing, error: existingErr } = await supabase
     .from("webhook_registrations")
     .select("document_id")
-    .eq("user_id", APP_USER_ID)
+    .eq("user_id", API_KEY_OWNER_ID)
     .eq("active", true);
   if (existingErr) throw new Error(`loading webhook_registrations: ${existingErr.message}`);
   const alreadyRegistered = new Set((existing ?? []).map((r) => r.document_id));
@@ -92,7 +92,7 @@ async function cmdRegister(onlyDocumentId) {
     const info = await onshape.registerWebhook({ documentId: doc.onshape_document_id, events: EVENTS, url: webhookUrl });
     const { error: insertErr } = await supabase.from("webhook_registrations").upsert(
       {
-        user_id: APP_USER_ID,
+        user_id: API_KEY_OWNER_ID,
         onshape_webhook_id: info.id,
         document_id: doc.id,
         events: EVENTS,
@@ -125,7 +125,7 @@ async function cmdList() {
   const { data, error } = await supabase
     .from("webhook_registrations")
     .select("onshape_webhook_id, events, active, created_at, unregistered_at, tracked_documents(name, onshape_document_id)")
-    .eq("user_id", APP_USER_ID)
+    .eq("user_id", API_KEY_OWNER_ID)
     .order("created_at", { ascending: false });
   if (error) throw new Error(`loading webhook_registrations: ${error.message}`);
   if (!data || data.length === 0) {
@@ -149,7 +149,7 @@ async function cmdUnregister(target) {
 
   let rows;
   if (target === "--all") {
-    const { data, error } = await supabase.from("webhook_registrations").select("onshape_webhook_id").eq("user_id", APP_USER_ID).eq("active", true);
+    const { data, error } = await supabase.from("webhook_registrations").select("onshape_webhook_id").eq("user_id", API_KEY_OWNER_ID).eq("active", true);
     if (error) throw new Error(error.message);
     rows = data ?? [];
   } else {
@@ -166,7 +166,7 @@ async function cmdUnregister(target) {
     const { error } = await supabase
       .from("webhook_registrations")
       .update({ active: false, unregistered_at: new Date().toISOString() })
-      .eq("user_id", APP_USER_ID)
+      .eq("user_id", API_KEY_OWNER_ID)
       .eq("onshape_webhook_id", row.onshape_webhook_id);
     if (error) console.log(`  FAILED updating local record: ${error.message}`);
   }

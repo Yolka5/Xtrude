@@ -1,6 +1,7 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { ingestDocumentHistory } from "../../scripts/lib/ingestDocument.mjs";
+import { loadOnshapeUserId } from "../../scripts/lib/userScope.mjs";
 import { isBudgetExceeded } from "../../scripts/lib/callBudget.mjs";
 
 export const DISCOVERY_EVENTS = [
@@ -76,6 +77,9 @@ export async function discoverForUser(
   };
 
   try {
+    // Resolved before any Onshape call: an account with no bound identity
+    // cannot have edits attributed to it, so nothing is spent on it.
+    const authorOnshapeId = await loadOnshapeUserId(supabase, userId);
     const { docs } = await onshape.listMyDocuments();
     summary.documentsSeen = docs.length;
 
@@ -117,7 +121,7 @@ export async function discoverForUser(
 
     for (const doc of needsBackfill ?? []) {
       try {
-        const ingested = await ingestDocumentHistory(supabase, onshape, doc, { markBackfilled: true, now });
+        const ingested = await ingestDocumentHistory(supabase, onshape, doc, { markBackfilled: true, now, authorOnshapeId });
         summary.documentsBackfilled++;
         summary.backfillEventsWritten += ingested.eventsWritten;
       } catch (err) {

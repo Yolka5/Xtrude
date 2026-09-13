@@ -4,7 +4,7 @@
  * freezes auto-spend on a missed past day, empty-so-far today does not break.
  */
 import { calendarDateInZone } from "./timezone.mjs";
-import { APP_USER_ID } from "./appUser.mjs";
+import { requireUserId } from "./userScope.mjs";
 import { addDaysIso, computeStreakAndFreezes } from "./streakMath.mjs";
 
 export function streakFromDaily(dailyRows, now = new Date()) {
@@ -25,7 +25,9 @@ export function streakFromDaily(dailyRows, now = new Date()) {
   return { ...streak, asOf: today, computedAt: now.toISOString() };
 }
 
-export async function snapshotStreak(supabase, now = new Date(), userId = APP_USER_ID) {
+/** One named user's streak. No default user: a missing id throws. */
+export async function snapshotStreak(supabase, now = new Date(), userId) {
+  requireUserId(userId, "snapshotStreak");
   const { data, error } = await supabase
     .from("daily_stats")
     .select("date, session_count, total_scored_minutes")

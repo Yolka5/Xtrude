@@ -16,14 +16,17 @@ async function sessionUserFromCookie(): Promise<string | null> {
     const claims = await readSessionClaims(jar.get(SESSION_COOKIE)?.value, getAuthSecret());
     if (!claims) return null;
     try {
-      const { data } = await getSupabase()
-        .from("app_state")
-        .select("value")
-        .eq("key", sessionLogoutKey(claims.userId))
-        .maybeSingle();
-      if (!sessionActiveAfterLogout(claims, parseLogoutStamp(data?.value))) return null;
+      const sb = getSupabase();
+      const [stamp, user] = await Promise.all([
+        sb.from("app_state").select("value").eq("key", sessionLogoutKey(claims.userId)).maybeSingle(),
+        sb.from("users").select("id").eq("id", claims.userId).maybeSingle(),
+      ]);
+      if (!sessionActiveAfterLogout(claims, parseLogoutStamp(stamp.data?.value))) return null;
+      // A signed cookie for an account that no longer exists is logged out -
+      // never an empty shell that pages would fill with placeholder data.
+      if (!user.error && !user.data) return null;
     } catch {
-      // Stamp lookup failed: HMAC is still valid, same as "never logged out".
+      // Lookup failed: HMAC is still valid, same as "never logged out".
     }
     return claims.userId;
   } catch {
@@ -32,8 +35,8 @@ async function sessionUserFromCookie(): Promise<string | null> {
 }
 
 /**
- * The signed-in user for this request. No Yoni fallback — a missing session
- * is logged out, not someone else's profile.
+ * The signed-in user for this request. No fallback account — a missing
+ * session is logged out, not someone else's profile.
  */
 export async function getCurrentUserId(): Promise<string> {
   const userId = await sessionUserFromCookie();

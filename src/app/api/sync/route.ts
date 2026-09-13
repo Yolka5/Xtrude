@@ -2,20 +2,25 @@ import "server-only";
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { runDirtySync } from "../../../../scripts/lib/runDirtySync.mjs";
+import { createCallBudget, maxCallsPerRun } from "../../../../scripts/lib/callBudget.mjs";
+import { lastSyncKey } from "../../../../scripts/lib/userScope.mjs";
 import { requireEnv } from "@/lib/env";
 import { PAGE_SYNC_MAX_AGE_MS } from "@/lib/pageSync";
 import { getSessionUserId } from "@/lib/auth/currentUser";
-import { APP_USER_ID } from "../../../../scripts/lib/appUser.mjs";
+import { onshapeClientForUser } from "@/lib/onshapeForUser";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
 /**
- * Page-load freshness: Today calls this in the background when last_sync
- * is older than 15 minutes. No CRON_SECRET - the browser cannot hold one -
- * so the 15-minute throttle is the budget guard. Dirty documents still
- * cost one documenthistory call each; a throttled or clean run costs zero.
+ * Page-load freshness: Today calls this in the background when the
+ * signed-in user's own last sync is older than 15 minutes. No CRON_SECRET -
+ * the browser cannot hold one - so the per-user 15-minute throttle is the
+ * budget guard. Only that user's dirty documents are read, with that
+ * user's own Onshape credentials: opening Today never spends another
+ * account's calls or touches another account's rows. A clean run costs
+ * zero Onshape calls.
  */
 
 export async function POST() {
@@ -23,20 +28,16 @@ export async function POST() {
   if (!userId) {
     return NextResponse.json({ ok: false, reason: "unauthenticated" }, { status: 401 });
   }
-  // API-key dirty sync is still Yoni-scoped. Another account must not spend
-  // those calls or refresh his last_sync just by opening Today.
-  if (userId !== APP_USER_ID) {
-    return NextResponse.json({ ok: true, skipped: true, reason: "other_account" });
-  }
 
   const supabase = createClient(requireEnv("SUPABASE_URL"), requireEnv("SUPABASE_SERVICE_ROLE_KEY"), {
     auth: { persistSession: false },
   });
 
+  const key = lastSyncKey(userId);
   const { data: last, error: lastErr } = await supabase
     .from("app_state")
     .select("updated_at")
-    .eq("key", "last_sync")
+    .eq("key", key)
     .maybeSingle();
   if (lastErr) {
     return NextResponse.json({ ok: false, reason: "load_failed", message: lastErr.message }, { status: 500 });
@@ -46,20 +47,30 @@ export async function POST() {
     return NextResponse.json({ ok: true, skipped: true, reason: "throttled" });
   }
 
+  const now = new Date();
+  const budget = createCallBudget(maxCallsPerRun());
   try {
     const summary = await runDirtySync(supabase, {
-      accessKey: requireEnv("ONSHAPE_ACCESS_KEY"),
-      secretKey: requireEnv("ONSHAPE_SECRET_KEY"),
+      userId,
+      budget,
+      now,
       trigger: "page",
+      getClient: () => onshapeClientForUser(userId, budget),
     });
+    const stamp = now.toISOString();
+    await supabase.from("app_state").upsert([
+      { key, value: summary, updated_at: stamp },
+      // /admin's "Last sync" card: the most recent run by anyone.
+      { key: "last_sync", value: summary, updated_at: stamp },
+    ]);
     let push: unknown = null;
     try {
       const { maybeSendPushReminders } = await import("@/lib/push/reminders");
-      push = await maybeSendPushReminders(new Date());
+      push = await maybeSendPushReminders(now);
     } catch {
       push = null;
     }
-    return NextResponse.json({ ok: summary.errors.length === 0, skipped: false, ...summary, push });
+    return NextResponse.json({ ...summary, ok: summary.errors.length === 0, skipped: false, push });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     return NextResponse.json({ ok: false, reason: "sync_failed", message }, { status: 500 });

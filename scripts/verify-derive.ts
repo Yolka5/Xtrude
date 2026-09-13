@@ -30,7 +30,12 @@ import {
 import { connectPathWithInvite, inviteCodeFromNext, invitePath, oauthStartPath, planJoinLanding, safeNextPath } from "../src/lib/invite";
 import { firstRunCopy } from "../src/lib/firstRun";
 import { withOAuthAccess } from "../src/lib/auth/oauthAccess";
-import { DEFAULT_MAX_CALLS_PER_RUN, simulateCappedRun } from "./lib/callBudget.mjs";
+import { createCallBudget, DEFAULT_MAX_CALLS_PER_RUN, simulateCappedRun } from "./lib/callBudget.mjs";
+import { eventRowsFromHistory } from "./lib/ingestDocument.mjs";
+import { rebuildSessions } from "./lib/sessionRebuild.mjs";
+import { snapshotStreak } from "./lib/streakSnapshot.mjs";
+import { runDirtySync } from "./lib/runDirtySync.mjs";
+import { claimAvailableHandleIn, claimHandleIn, HANDLE_TAKEN, type HandleStore } from "../src/lib/handleClaim";
 import { assembleSessionDocuments, countDocumentsFromEvents, sessionQualification } from "../src/lib/sessionDetail";
 import { memberSinceLabel, planHandleClaim, profileImageUrlFromSession, sanitizeDisplayName, sanitizeHandle, displayHandle, handleStemFromIdentity, handleCandidateAt } from "../src/lib/profileFields";
 
@@ -1042,6 +1047,151 @@ void (async () => {
       if (prevAuth === undefined) delete process.env.REQUIRE_AUTH;
       else process.env.REQUIRE_AUTH = prevAuth;
     }
+  }
+
+  {
+    // One shared team document: a single history, several collaborators.
+    const history = {
+      rows: [
+        { microversionId: "m1", date: "2026-09-10T10:00:00Z", userId: "os-tom", username: "Tom" },
+        { microversionId: "m2", date: "2026-09-10T10:01:00Z", userId: "os-yoni", username: "Yoni" },
+        { microversionId: "m3", date: "2026-09-10T10:02:00Z", userId: "os-tom", username: "Tom" },
+        { microversionId: "m4", date: "2026-09-10T10:03:00Z", userId: "os-teammate", username: "Teammate" },
+      ],
+    };
+    const tomRows = eventRowsFromHistory("doc-tom", history, "user-tom", "os-tom");
+    const yoniRows = eventRowsFromHistory("doc-yoni", history, "user-yoni", "os-yoni");
+    check(
+      "a shared document credits Tom with only the edits Tom made",
+      tomRows.length === 2 &&
+        tomRows.every((r: { user_id: string; raw: { userId: string } }) => r.user_id === "user-tom" && r.raw.userId === "os-tom"),
+      JSON.stringify(tomRows.map((r: { microversion_id: string }) => r.microversion_id))
+    );
+    check(
+      "the same history credits Yoni with only Yoni's edit, and a teammate's edit with nobody",
+      yoniRows.length === 1 && yoniRows[0].microversion_id === "m2",
+      JSON.stringify(yoniRows.map((r: { microversion_id: string }) => r.microversion_id))
+    );
+    const refuses = (fn: () => unknown) => {
+      try {
+        fn();
+        return false;
+      } catch {
+        return true;
+      }
+    };
+    check(
+      "history rows without a user are refused, not filed under a default account",
+      refuses(() => eventRowsFromHistory("d", history, undefined, "os-tom")),
+      ""
+    );
+    check(
+      "history rows without an author to filter on are refused",
+      refuses(() => eventRowsFromHistory("d", history, "user-tom", undefined)),
+      ""
+    );
+  }
+
+  {
+    // Any database access fails these: a missing user must be rejected
+    // before a single row is read, written, or wiped.
+    const untouchable = new Proxy({}, { get() { throw new Error("touched the database"); } });
+    const rejectsWithoutUser = async (fn: () => Promise<unknown>) => {
+      try {
+        await fn();
+        return false;
+      } catch (err) {
+        return /userId is required/.test(err instanceof Error ? err.message : String(err));
+      }
+    };
+    check("rebuildSessions will not run without a user", await rejectsWithoutUser(() => rebuildSessions(untouchable, {} as never)), "");
+    check("snapshotStreak will not run without a user", await rejectsWithoutUser(() => snapshotStreak(untouchable, new Date())), "");
+    check(
+      "runDirtySync will not run without a user",
+      await rejectsWithoutUser(() => runDirtySync(untouchable, { budget: createCallBudget(1) })),
+      ""
+    );
+  }
+
+  {
+    type Reservations = Map<string, string>;
+    // The database as it really is: reserve is one atomic insert, and reads
+    // see what is there now.
+    const liveStore = (reserved: Reservations, current: Map<string, string>): HandleStore => ({
+      async reserve(handle, userId) {
+        if (reserved.has(handle)) return "conflict";
+        reserved.set(handle, userId);
+        return "ok";
+      },
+      async ownerOf(handle) {
+        return reserved.get(handle) ?? null;
+      },
+      async currentHandle(userId) {
+        return current.get(userId) ?? null;
+      },
+      async setCurrentHandle(userId, handle) {
+        current.set(userId, handle);
+      },
+      async release(handle, userId) {
+        if (reserved.get(handle) === userId) reserved.delete(handle);
+      },
+    });
+    // A server render: every read returns what the database held when the
+    // render started, even after the render wrote (Next's GET memoization).
+    const renderStore = (reserved: Reservations, current: Map<string, string>): HandleStore => {
+      const ownersAtStart = new Map(reserved);
+      const handlesAtStart = new Map(current);
+      return {
+        ...liveStore(reserved, current),
+        async ownerOf(handle) {
+          return ownersAtStart.get(handle) ?? null;
+        },
+        async currentHandle(userId) {
+          return handlesAtStart.get(userId) ?? null;
+        },
+      };
+    };
+
+    const reserved: Reservations = new Map();
+    const current = new Map<string, string>();
+    const first = await claimAvailableHandleIn(renderStore(reserved, current), "u-moochah", "moochah");
+    check(
+      "a first automatic @ claimed during a server render is the plain name",
+      first === "moochah" && current.get("u-moochah") === "moochah",
+      String(first)
+    );
+    check("that claim reserves one @, not moochah2..moochah20", [...reserved.keys()].join(",") === "moochah", [...reserved.keys()].join(","));
+    const again = await claimAvailableHandleIn(renderStore(reserved, current), "u-moochah", "moochah");
+    check("claiming your own @ again keeps it and reserves nothing new", again === "moochah" && reserved.size === 1, `${again} ${[...reserved.keys()]}`);
+
+    const tabs = await Promise.all([
+      claimAvailableHandleIn(liveStore(reserved, current), "u-tamir", "tamir"),
+      claimAvailableHandleIn(liveStore(reserved, current), "u-tamir", "tamir"),
+    ]);
+    check(
+      "two first-open requests for one account agree on a single @",
+      tabs[0] === "tamir" && tabs[1] === "tamir" && current.get("u-tamir") === "tamir" && !reserved.has("tamir2"),
+      `${tabs} ${[...reserved.keys()]}`
+    );
+
+    const secondTamir = await claimAvailableHandleIn(liveStore(reserved, current), "u-tamir-b", "tamir");
+    check("a second Tamir gets @tamir2, never the first Tamir's @", secondTamir === "tamir2" && reserved.get("tamir") === "u-tamir", String(secondTamir));
+
+    let takenMessage = "";
+    try {
+      await claimHandleIn(liveStore(reserved, current), "u-tom", "tamir");
+    } catch (err) {
+      takenMessage = err instanceof Error ? err.message : String(err);
+    }
+    check("typing someone else's @ is refused", takenMessage === HANDLE_TAKEN && !current.has("u-tom"), takenMessage);
+
+    await claimHandleIn(liveStore(reserved, current), "u-tamir", "tamir_s");
+    const freed = await claimHandleIn(liveStore(reserved, current), "u-tom", "tamir");
+    check(
+      "changing your @ frees the old one for someone else",
+      freed.handle === "tamir" && reserved.get("tamir") === "u-tom" && reserved.get("tamir_s") === "u-tamir",
+      JSON.stringify([...reserved])
+    );
   }
 
   console.log(failures ? `\n${failures} check(s) FAILED` : "\nAll checks pass.");
