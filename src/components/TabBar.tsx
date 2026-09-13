@@ -28,7 +28,7 @@ const TABS: { href: string; label: string; icon: IconName; match: RegExp }[] = [
 export function TabBar() {
   const raw = usePathname() || "/";
   const path = raw.length > 1 ? raw.replace(/\/+$/, "") || "/" : raw;
-  if (path === "/connect") return null;
+  if (path === "/connect" || path === "/welcome") return null;
 
   return (
     <nav className="tabbar" aria-label="Primary">

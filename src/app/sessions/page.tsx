@@ -1,5 +1,6 @@
 import { FlyItem } from "@/components/FlyItem";
 import { SessionRow } from "@/components/SessionRow";
+import { requireAppUser } from "@/lib/auth/requireAppUser";
 import { getRealData } from "@/lib/db/queries";
 import type { Session } from "@/lib/fixtures";
 import { dayLabel, duration, plural } from "@/lib/format";
@@ -7,6 +8,7 @@ import { dayLabel, duration, plural } from "@/lib/format";
 export const dynamic = "force-dynamic";
 
 export default async function SessionsScreen() {
+  await requireAppUser();
   const { sessions: allSessions, hasAnyData } = await getRealData();
 
   // group newest-first by day

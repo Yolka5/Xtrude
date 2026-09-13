@@ -17,6 +17,7 @@ import { maybeOnboardUser } from "@/lib/onboarding";
 import { joinLeagueByCode } from "@/lib/db/leagues";
 import { INVITE_COOKIE, invitePath, parseInviteCode } from "@/lib/invite";
 import { profileImageUrlFromSession } from "@/lib/profileFields";
+import { getHandleForUser } from "@/lib/db/handles";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -109,6 +110,12 @@ export async function GET(req: NextRequest) {
     } catch {
       dest = new URL(invitePath(invite), req.nextUrl.origin);
     }
+  }
+  const existingHandle = await getHandleForUser(user.id);
+  if (!existingHandle) {
+    const welcome = new URL("/welcome/", req.nextUrl.origin);
+    welcome.searchParams.set("next", `${dest.pathname}${dest.search}`);
+    dest = welcome;
   }
   const res = NextResponse.redirect(dest);
   res.cookies.set(SESSION_COOKIE, session, sessionCookieOptions(req.nextUrl.protocol === "https:"));

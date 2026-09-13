@@ -1,5 +1,5 @@
 import { getSupabase } from "@/lib/db/client";
-import { getCurrentUserId } from "@/lib/auth/currentUser";
+import { getSessionUserId } from "@/lib/auth/currentUser";
 import { listReauthFlags } from "@/lib/auth/tokens";
 import { maxCallsPerRun } from "../../../scripts/lib/callBudget.mjs";
 
@@ -37,14 +37,16 @@ function timeAgo(iso: string): string {
 
 export default async function AdminPage() {
   const supabase = getSupabase();
-  const userId = await getCurrentUserId();
+  const userId = await getSessionUserId();
 
-  const { data: deliveries, error: deliveriesErr } = await supabase
-    .from("webhook_deliveries")
-    .select("id, received_at, onshape_webhook_id, event, accepted, reason, ip, tracked_documents(name)")
-    .eq("user_id", userId)
-    .order("received_at", { ascending: false })
-    .limit(50);
+  const { data: deliveries, error: deliveriesErr } = userId
+    ? await supabase
+        .from("webhook_deliveries")
+        .select("id, received_at, onshape_webhook_id, event, accepted, reason, ip, tracked_documents(name)")
+        .eq("user_id", userId)
+        .order("received_at", { ascending: false })
+        .limit(50)
+    : { data: [], error: null };
 
   const { data: stateRows } = await supabase
     .from("app_state")

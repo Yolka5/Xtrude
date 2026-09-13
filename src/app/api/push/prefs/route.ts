@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUserId } from "@/lib/auth/currentUser";
+import { getSessionUserId } from "@/lib/auth/currentUser";
 import { getSupabase } from "@/lib/db/client";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  const userId = await getCurrentUserId();
+  const userId = await getSessionUserId();
+  if (!userId) return NextResponse.json({ error: "unauthenticated" }, { status: 401 });
   const { data, error } = await getSupabase()
     .from("users")
     .select("notify_streak, notify_league")
@@ -25,7 +26,8 @@ export async function POST(req: NextRequest) {
   } catch {
     return NextResponse.json({ error: "invalid json" }, { status: 400 });
   }
-  const userId = await getCurrentUserId();
+  const userId = await getSessionUserId();
+  if (!userId) return NextResponse.json({ error: "unauthenticated" }, { status: 401 });
   const patch: { notify_streak?: boolean; notify_league?: boolean } = {};
   if (typeof body.streak === "boolean") patch.notify_streak = body.streak;
   if (typeof body.league === "boolean") patch.notify_league = body.league;

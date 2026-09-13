@@ -98,6 +98,7 @@ export function ProfileContent({
   displayName,
   memberSince,
   imageUrl,
+  handle,
 }: {
   profile: ProfileStats;
   records: PersonalRecord[];
@@ -108,6 +109,7 @@ export function ProfileContent({
   displayName: string;
   memberSince: string;
   imageUrl: string | null;
+  handle: string;
 }) {
   const earned = badges.filter((b) => b.earned).length;
 
@@ -130,7 +132,7 @@ export function ProfileContent({
         <h1 className="screen__title">Profile</h1>
         <ProfileIdentity
           displayName={displayName}
-          handle={profile.handle}
+          handle={handle}
           memberSince={memberSince}
           imageUrl={imageUrl}
         />

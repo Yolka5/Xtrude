@@ -7,6 +7,7 @@ import { calendarDateInZone, clockHmInZone } from "../../../scripts/lib/timezone
 import { storedOnshapeImageUrl } from "@/lib/auth/tokens";
 import { memberSinceLabel, sanitizeDisplayName } from "@/lib/profileFields";
 import { initialsFromDisplayName } from "@/lib/localProfile";
+import { getHandleForUser } from "@/lib/db/handles";
 
 export type { RealData };
 
@@ -150,6 +151,7 @@ export type AccountProfile = {
   displayName: string;
   memberSince: string;
   imageUrl: string | null;
+  handle: string | null;
 };
 
 export async function getAccountProfile(): Promise<AccountProfile> {
@@ -159,11 +161,12 @@ export async function getAccountProfile(): Promise<AccountProfile> {
     .select("display_name, created_at")
     .eq("id", userId)
     .maybeSingle();
-  const imageUrl = await storedOnshapeImageUrl(userId);
+  const [imageUrl, handle] = await Promise.all([storedOnshapeImageUrl(userId), getHandleForUser(userId)]);
   return {
     displayName: typeof data?.display_name === "string" && data.display_name.trim() ? data.display_name : "You",
     memberSince: memberSinceLabel(data?.created_at as string | undefined) ?? "-",
     imageUrl,
+    handle,
   };
 }
 

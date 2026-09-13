@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUserId } from "@/lib/auth/currentUser";
+import { getSessionUserId } from "@/lib/auth/currentUser";
 import { getSupabase } from "@/lib/db/client";
 
 export const dynamic = "force-dynamic";
@@ -14,7 +14,8 @@ export async function POST(req: NextRequest) {
   if (!body.endpoint || !body.keys?.p256dh || !body.keys?.auth) {
     return NextResponse.json({ error: "subscription required" }, { status: 400 });
   }
-  const userId = await getCurrentUserId();
+  const userId = await getSessionUserId();
+  if (!userId) return NextResponse.json({ error: "unauthenticated" }, { status: 401 });
   const { error } = await getSupabase().from("push_subscriptions").upsert(
     {
       user_id: userId,
@@ -36,7 +37,8 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ error: "invalid json" }, { status: 400 });
   }
   if (!body.endpoint) return NextResponse.json({ error: "endpoint required" }, { status: 400 });
-  const userId = await getCurrentUserId();
+  const userId = await getSessionUserId();
+  if (!userId) return NextResponse.json({ error: "unauthenticated" }, { status: 401 });
   const { error } = await getSupabase()
     .from("push_subscriptions")
     .delete()

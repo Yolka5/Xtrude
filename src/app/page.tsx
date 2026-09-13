@@ -6,6 +6,7 @@ import { RecentSessionCard } from "@/components/SessionRow";
 import { FlyItem } from "@/components/FlyItem";
 import { PullToRefresh } from "@/components/PullToRefresh";
 import { Icon } from "@/components/Icon";
+import { requireAppUser } from "@/lib/auth/requireAppUser";
 import { getLastSyncAt, getRealData, hasOnshapeBinding } from "@/lib/db/queries";
 import { duration, durationSpoken, longDate, plural, splitDuration } from "@/lib/format";
 import { BackgroundSync } from "@/components/BackgroundSync";
@@ -20,6 +21,7 @@ export default async function TodayScreen({
 }: {
   searchParams: Promise<{ onboarded?: string }>;
 }) {
+  await requireAppUser();
   const [{ today, todayStats, streak, week, sessions, hasAnyData }, lastSyncAt, params, onshapeConnected] = await Promise.all([
     getRealData(),
     getLastSyncAt(),

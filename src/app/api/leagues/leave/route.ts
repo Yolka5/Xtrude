@@ -16,6 +16,7 @@ export async function POST(req: NextRequest) {
     await leaveLeague(await getCurrentUserId(), body.leagueId);
     return NextResponse.json({ ok: true });
   } catch (err) {
-    return NextResponse.json({ error: err instanceof Error ? err.message : "failed" }, { status: 400 });
+    const message = err instanceof Error ? err.message : "failed";
+    return NextResponse.json({ error: message }, { status: message === "unauthenticated" ? 401 : 400 });
   }
 }

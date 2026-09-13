@@ -1,6 +1,5 @@
 import "server-only";
 import { cookies } from "next/headers";
-import { APP_USER_ID } from "../../../scripts/lib/appUser.mjs";
 import { getAuthSecret } from "./secret";
 import { getSupabase } from "@/lib/db/client";
 import {
@@ -33,15 +32,13 @@ async function sessionUserFromCookie(): Promise<string | null> {
 }
 
 /**
- * The user this request should act as.
- *
- * Prefer the signed session cookie (Onshape OAuth). If there is no session —
- * the live app today, or a visitor before they connect — fall back to Yoni's
- * row so Today/Sessions/Profile keep working. Set REQUIRE_AUTH=1 to send
- * logged-out visitors to /connect instead (see src/proxy.ts).
+ * The signed-in user for this request. No Yoni fallback — a missing session
+ * is logged out, not someone else's profile.
  */
 export async function getCurrentUserId(): Promise<string> {
-  return (await sessionUserFromCookie()) ?? APP_USER_ID;
+  const userId = await sessionUserFromCookie();
+  if (!userId) throw new Error("unauthenticated");
+  return userId;
 }
 
 export async function getSessionUserId(): Promise<string | null> {

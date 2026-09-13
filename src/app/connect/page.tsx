@@ -1,7 +1,10 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { FlyItem } from "@/components/FlyItem";
 import { Icon } from "@/components/Icon";
-import { oauthStartPath, inviteCodeFromNext } from "@/lib/invite";
+import { getSessionUserId } from "@/lib/auth/currentUser";
+import { getHandleForUser } from "@/lib/db/handles";
+import { oauthStartPath, inviteCodeFromNext, safeNextPath } from "@/lib/invite";
 
 export const dynamic = "force-dynamic";
 
@@ -23,6 +26,11 @@ export default async function ConnectPage({
   searchParams: Promise<{ error?: string; next?: string }>;
 }) {
   const { error, next } = await searchParams;
+  const sessionUserId = await getSessionUserId();
+  if (sessionUserId && !error) {
+    const handle = await getHandleForUser(sessionUserId);
+    redirect(handle ? safeNextPath(next) ?? "/" : "/welcome/");
+  }
   const message = error ? ERRORS[error] ?? "Something went wrong signing in." : null;
   const startHref = oauthStartPath(next ?? null);
   const invited = Boolean(inviteCodeFromNext(next ?? null));
@@ -30,21 +38,22 @@ export default async function ConnectPage({
   return (
     <main className="screen">
       <FlyItem>
-        <h1 className="screen__title">Xtrude</h1>
-        <p className="screen__subtitle t-subhead">Modeled time, measured from what you actually built.</p>
+        <h1 className="screen__title">Log in</h1>
+        <p className="screen__subtitle t-subhead">Or sign up — connecting Onshape creates your account.</p>
       </FlyItem>
 
       <FlyItem>
         <section className="chunk" style={{ padding: "22px 18px" }}>
           <div className="stack" style={{ gap: 12 }}>
             <p className="t-body" style={{ margin: 0 }}>
-              Connect your Onshape account. Xtrude watches the documents you touch
-              and turns real edits into sessions, streaks, and a league.
+              Xtrude is per Onshape account. Log in with yours so you see your
+              sessions, not someone else&apos;s.
             </p>
             <ul className="t-footnote dim" style={{ margin: 0, paddingLeft: 18, display: "grid", gap: 6 }}>
-              <li>See what you modeled today, not what you meant to.</li>
-              <li>We register webhooks on your 20 most recently modified documents.</li>
-              <li>{invited ? "After you connect, you land in the league you were invited to." : "You land on Today. Tracking starts from that moment."}</li>
+              <li>New here? Continue with Onshape to create an Xtrude account.</li>
+              <li>Already connected? Same button logs you back in.</li>
+              <li>After that you pick your @ handle.</li>
+              {invited ? <li>Then you land in the league you were invited to.</li> : null}
             </ul>
             {message ? (
               <p className="t-footnote" style={{ margin: 0, color: "var(--neg, #b42318)" }}>
@@ -67,7 +76,7 @@ export default async function ConnectPage({
               }}
             >
               <Icon name="doc" size={18} />
-              Connect Onshape
+              Continue with Onshape
             </Link>
             <p className="t-caption dimmer" style={{ margin: 0 }}>
               We request read access to your profile and documents. Tokens stay on

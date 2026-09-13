@@ -14,7 +14,7 @@ import { calendarDateInZone, clockHmInZone, isAfterMidnightWindow } from "./lib/
 import { rankStandings, generateJoinCode, JOIN_CODE_ALPHABET, JOIN_CODE_LENGTH, joinCodeIsUnambiguous, allocateJoinCode, renameLeagueState, regenerateLeagueCode } from "../src/lib/leagueStandings";
 import { decryptSecret, encryptSecret } from "../src/lib/auth/tokenCrypto";
 import { createSessionToken, readSessionUserId, authenticatedUserId, SESSION_COOKIE } from "../src/lib/auth/session";
-import { proxy, isPublicPath } from "../src/proxy";
+import { proxy, isPublicPath, sessionRequired } from "../src/proxy";
 import { NextRequest } from "next/server";
 import { discoveryDue, whoIsDue } from "../src/lib/discoverySchedule";
 import { applyOnshapeLogin, canRebindOnshapeId, sessionsFor, type UserDataStore } from "../src/lib/auth/bindUser";
@@ -31,7 +31,7 @@ import { firstRunCopy } from "../src/lib/firstRun";
 import { withOAuthAccess } from "../src/lib/auth/oauthAccess";
 import { DEFAULT_MAX_CALLS_PER_RUN, simulateCappedRun } from "./lib/callBudget.mjs";
 import { assembleSessionDocuments, countDocumentsFromEvents, sessionQualification } from "../src/lib/sessionDetail";
-import { memberSinceLabel, profileImageUrlFromSession, sanitizeDisplayName } from "../src/lib/profileFields";
+import { memberSinceLabel, planHandleClaim, profileImageUrlFromSession, sanitizeDisplayName, sanitizeHandle, displayHandle } from "../src/lib/profileFields";
 
 const DAY = 86_400_000;
 // Fix "today" to a known Wednesday: 2026-09-09 12:00 UTC (matches the app's
@@ -804,6 +804,21 @@ check(
   check("sanitizeDisplayName trims and collapses spaces", sanitizeDisplayName("  Yoni   S  ") === "Yoni S", sanitizeDisplayName("  Yoni   S  "));
   check("sanitizeDisplayName rejects blank as empty when fallback is empty", sanitizeDisplayName("   ", "") === "", "");
   check("member since is month + year from created_at", memberSinceLabel("2026-03-15T12:00:00.000Z") === "March 2026", String(memberSinceLabel("2026-03-15T12:00:00.000Z")));
+  check("sanitizeHandle accepts a chosen @ and strips the sigil", sanitizeHandle("@Tamir_1") === "tamir_1", String(sanitizeHandle("@Tamir_1")));
+  check("sanitizeHandle rejects reserved and junk", sanitizeHandle("admin") === null && sanitizeHandle("1bad") === null && sanitizeHandle("ab") === "ab", "");
+  check("displayHandle always shows one @", displayHandle("tamir") === "@tamir" && displayHandle("@tamir") === "@tamir", "");
+  check(
+    "planHandleClaim blocks a handle already taken by someone else",
+    planHandleClaim({ userId: "b", raw: "tamir", takenBy: "a" }).ok === false,
+    ""
+  );
+  check(
+    "planHandleClaim lets you keep or take a free handle",
+    planHandleClaim({ userId: "a", raw: "tamir", takenBy: "a" }).ok === true &&
+      planHandleClaim({ userId: "a", raw: "tamir", takenBy: null }).ok === true,
+    ""
+  );
+  check("a different account is not assigned @yoni", displayHandle("tamir") !== "@yoni", "");
 }
 
 {
@@ -985,6 +1000,23 @@ void (async () => {
     else process.env.REQUIRE_AUTH = prevAuth;
     if (prevSecret === undefined) delete process.env.AUTH_SECRET;
     else process.env.AUTH_SECRET = prevSecret;
+  }
+
+  {
+    const prevAuth = process.env.REQUIRE_AUTH;
+    delete process.env.REQUIRE_AUTH;
+    try {
+      check("session is required by default so the app does not open as Yoni", sessionRequired() === true, "");
+      const home = await proxy(new NextRequest(new URL("/", "http://localhost:3000")));
+      check(
+        "logged-out / goes to log in even when REQUIRE_AUTH is unset",
+        home.status >= 300 && home.status < 400 && (home.headers.get("location") ?? "").includes("/connect"),
+        `status=${home.status} loc=${home.headers.get("location")}`
+      );
+    } finally {
+      if (prevAuth === undefined) delete process.env.REQUIRE_AUTH;
+      else process.env.REQUIRE_AUTH = prevAuth;
+    }
   }
 
   console.log(failures ? `\n${failures} check(s) FAILED` : "\nAll checks pass.");

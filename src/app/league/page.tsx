@@ -1,7 +1,7 @@
 import { LeagueContent } from "@/components/LeagueContent";
 import { LeagueManage } from "@/components/LeagueManage";
 import { getLeagueView } from "@/lib/db/leagues";
-import { getCurrentUserId } from "@/lib/auth/currentUser";
+import { requireAppUser } from "@/lib/auth/requireAppUser";
 
 export const dynamic = "force-dynamic";
 
@@ -11,7 +11,7 @@ export default async function LeagueScreen({
   searchParams: Promise<{ league?: string }>;
 }) {
   const { league: leagueId } = await searchParams;
-  const league = await getLeagueView(await getCurrentUserId(), leagueId);
+  const league = await getLeagueView(await requireAppUser(), leagueId);
   return (
     <LeagueContent league={league} lonely={league.memberCount <= 1}>
       <LeagueManage

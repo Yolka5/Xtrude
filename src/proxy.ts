@@ -19,13 +19,16 @@ import {
  * a self-redirect loop ("too many redirects"). Existing Onshape
  * registrations stay valid — no re-register.
  *
- * Auth: REQUIRE_AUTH=1 sends visitors without a session cookie to /connect/.
- * Default is off so Yoni's account keeps working with the APP_USER_ID
- * fallback until OAuth is confirmed. Webhooks, crons, OAuth, and /admin
- * (the only liveness tripwire) stay reachable either way. A missing
- * session must redirect, never 500. A cookie that was valid before the
- * user signed out is treated as logged-out, not as a live session.
+ * Auth: visitors without a session cookie go to /connect/ (log in / sign up).
+ * Set REQUIRE_AUTH=0 only to turn that gate off. Webhooks, crons, OAuth,
+ * /join, and /admin stay reachable either way. A missing session must
+ * redirect, never 500. A cookie that was valid before the user signed out
+ * is treated as logged-out, not as a live session.
  */
+
+export function sessionRequired(): boolean {
+  return process.env.REQUIRE_AUTH !== "0";
+}
 
 export function isPublicPath(pathname: string): boolean {
   const path = pathname.length > 1 ? pathname.replace(/\/+$/, "") || "/" : pathname;
@@ -58,7 +61,7 @@ export async function proxy(request: NextRequest, deps: ProxyDeps = {}) {
     return NextResponse.next();
   }
 
-  if (process.env.REQUIRE_AUTH === "1" && !isPublicPath(pathname)) {
+  if (sessionRequired() && !isPublicPath(pathname)) {
     let userId: string | null = null;
     try {
       const claims = await readSessionClaims(request.cookies.get(SESSION_COOKIE)?.value, getAuthSecret());

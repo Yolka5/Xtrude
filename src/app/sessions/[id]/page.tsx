@@ -6,6 +6,7 @@ import { FlyItem } from "@/components/FlyItem";
 import { Icon } from "@/components/Icon";
 import { SetNavTitle } from "@/components/NavTitle";
 import { SCORING } from "@/lib/fixtures";
+import { requireAppUser } from "@/lib/auth/requireAppUser";
 import { getSessionDetail } from "@/lib/db/queries";
 import { clockTime, dayLabel, duration, durationSpoken, longDate, plural } from "@/lib/format";
 import { docColor } from "@/lib/docColor";
@@ -14,6 +15,7 @@ export const dynamic = "force-dynamic";
 
 export default async function SessionDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
+  await requireAppUser();
   const session = await getSessionDetail(id);
   if (!session) notFound();
 
