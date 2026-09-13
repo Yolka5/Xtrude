@@ -15,6 +15,7 @@ import { rankStandings, generateJoinCode, JOIN_CODE_ALPHABET, JOIN_CODE_LENGTH, 
 import { decryptSecret, encryptSecret } from "../src/lib/auth/tokenCrypto";
 import { createSessionToken, readSessionUserId, authenticatedUserId, SESSION_COOKIE } from "../src/lib/auth/session";
 import { proxy, isPublicPath, sessionRequired } from "../src/proxy";
+import { isAuthEntryPath } from "../src/lib/auth/entryPaths";
 import { NextRequest } from "next/server";
 import { discoveryDue, whoIsDue } from "../src/lib/discoverySchedule";
 import { applyOnshapeLogin, canRebindOnshapeId, sessionsFor, type UserDataStore } from "../src/lib/auth/bindUser";
@@ -31,7 +32,7 @@ import { firstRunCopy } from "../src/lib/firstRun";
 import { withOAuthAccess } from "../src/lib/auth/oauthAccess";
 import { DEFAULT_MAX_CALLS_PER_RUN, simulateCappedRun } from "./lib/callBudget.mjs";
 import { assembleSessionDocuments, countDocumentsFromEvents, sessionQualification } from "../src/lib/sessionDetail";
-import { memberSinceLabel, planHandleClaim, profileImageUrlFromSession, sanitizeDisplayName, sanitizeHandle, displayHandle } from "../src/lib/profileFields";
+import { memberSinceLabel, planHandleClaim, profileImageUrlFromSession, sanitizeDisplayName, sanitizeHandle, displayHandle, handleStemFromIdentity, handleCandidateAt } from "../src/lib/profileFields";
 
 const DAY = 86_400_000;
 // Fix "today" to a known Wednesday: 2026-09-09 12:00 UTC (matches the app's
@@ -819,6 +820,18 @@ check(
     ""
   );
   check("a different account is not assigned @yoni", displayHandle("tamir") !== "@yoni", "");
+  check(
+    "Onshape Tamir becomes @tamir, not @yoni",
+    handleStemFromIdentity({ firstName: "Tamir", lastName: "Sarfaty", name: "Tamir Sarfaty" }) === "tamir",
+    String(handleStemFromIdentity({ firstName: "Tamir", lastName: "Sarfaty", name: "Tamir Sarfaty" }))
+  );
+  check(
+    "Onshape Tom becomes @tom",
+    handleStemFromIdentity({ firstName: "Tom", lastName: "Moyal", name: "Tom Moyal" }) === "tom",
+    String(handleStemFromIdentity({ firstName: "Tom", lastName: "Moyal", name: "Tom Moyal" }))
+  );
+  check("a taken stem gets a numeric suffix", handleCandidateAt("tamir", 1) === "tamir2", String(handleCandidateAt("tamir", 1)));
+  check("Yoni's own Onshape name can be @yoni", handleStemFromIdentity({ firstName: "Yoni", name: "Yoni" }) === "yoni", "");
 }
 
 {
@@ -962,11 +975,23 @@ void (async () => {
       !threw && sessionsRes != null && sessionsRes.status >= 300 && sessionsRes.status < 400 && (sessionsRes.headers.get("location") ?? "").includes("/connect"),
       `threw=${threw} status=${sessionsRes?.status} loc=${sessionsRes?.headers.get("location")}`
     );
+    const profileRes = await proxy(loggedOut("/profile/"));
+    check(
+      "REQUIRE_AUTH=1 sends a logged-out /profile/ to /connect/",
+      profileRes.status >= 300 && profileRes.status < 400 && (profileRes.headers.get("location") ?? "").includes("/connect"),
+      `status=${profileRes.status} loc=${profileRes.headers.get("location")}`
+    );
     const homeRes = await proxy(loggedOut("/"));
     check(
       "REQUIRE_AUTH=1 sends a logged-out / to /connect/",
       homeRes.status >= 300 && homeRes.status < 400 && (homeRes.headers.get("location") ?? "").includes("/connect"),
       `status=${homeRes.status} loc=${homeRes.headers.get("location")}`
+    );
+    const connectRes = await proxy(loggedOut("/connect/"));
+    check(
+      "REQUIRE_AUTH=1 leaves /connect/ public as the first-entry screen",
+      isPublicPath("/connect/") && isAuthEntryPath("/connect") && connectRes.status < 300 && !(connectRes.headers.get("location") ?? "").includes("/connect"),
+      `status=${connectRes.status} loc=${connectRes.headers.get("location")}`
     );
     const joinRes = await proxy(loggedOut("/join/?code=ABC234"));
     check(

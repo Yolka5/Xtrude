@@ -77,6 +77,8 @@ export type LeagueMember = {
   /** lastRank - rank. Positive is a climb. */
   movement: number;
   isMe: boolean;
+  /** Chosen @ without the sigil, when this member has one. */
+  handle?: string;
 };
 
 export type League = {

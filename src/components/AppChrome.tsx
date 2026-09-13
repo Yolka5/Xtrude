@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Icon } from "./Icon";
 import { useNavTitle } from "./NavTitle";
+import { isAuthEntryPath } from "@/lib/auth/entryPaths";
 
 type Chrome = { title: string | null; back?: { href: string; label: string } };
 
@@ -22,8 +23,6 @@ function chromeFor(path: string, navTitle: string | null): Chrome {
   if (path === "/sessions") return { title: "Sessions" };
   if (path === "/league") return { title: "League" };
   if (path === "/profile") return { title: "Profile" };
-  if (path === "/connect") return { title: "Xtrude" };
-
   const m = path.match(/^\/sessions\/([^/]+)$/);
   if (m) {
     return {
@@ -39,8 +38,8 @@ export function AppChrome() {
   const path = raw.length > 1 ? raw.replace(/\/+$/, "") || "/" : raw;
   const navTitle = useNavTitle();
   const { title, back } = chromeFor(path, navTitle);
-
   const [stuck, setStuck] = useState(false);
+
   useEffect(() => {
     // The bar has nothing to separate from until the large title starts
     // passing beneath it - the HIG scroll edge effect.
@@ -52,6 +51,8 @@ export function AppChrome() {
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => { window.removeEventListener("scroll", onScroll); if (frame) cancelAnimationFrame(frame); };
   }, [path]);
+
+  if (isAuthEntryPath(path)) return null;
 
   return (
     <header className="navbar" data-stuck={stuck}>

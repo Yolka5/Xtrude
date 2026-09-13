@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { motion } from "motion/react";
 import { Icon, type IconName } from "./Icon";
 import { haptics } from "@/lib/haptics";
+import { isAuthEntryPath } from "@/lib/auth/entryPaths";
 
 const TABS: { href: string; label: string; icon: IconName; match: RegExp }[] = [
   { href: "/",          label: "Today",    icon: "today",    match: /^\/$/ },
@@ -28,7 +29,7 @@ const TABS: { href: string; label: string; icon: IconName; match: RegExp }[] = [
 export function TabBar() {
   const raw = usePathname() || "/";
   const path = raw.length > 1 ? raw.replace(/\/+$/, "") || "/" : raw;
-  if (path === "/connect" || path === "/welcome") return null;
+  if (isAuthEntryPath(path)) return null;
 
   return (
     <nav className="tabbar" aria-label="Primary">

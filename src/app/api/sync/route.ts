@@ -1,9 +1,11 @@
 import "server-only";
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { runDirtySync } from "../../../../scripts/lib/runDirtySync.mjs";
 import { requireEnv } from "@/lib/env";
 import { PAGE_SYNC_MAX_AGE_MS } from "@/lib/pageSync";
+import { getSessionUserId } from "@/lib/auth/currentUser";
+import { APP_USER_ID } from "../../../../scripts/lib/appUser.mjs";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -17,6 +19,16 @@ export const maxDuration = 60;
  */
 
 export async function POST() {
+  const userId = await getSessionUserId();
+  if (!userId) {
+    return NextResponse.json({ ok: false, reason: "unauthenticated" }, { status: 401 });
+  }
+  // API-key dirty sync is still Yoni-scoped. Another account must not spend
+  // those calls or refresh his last_sync just by opening Today.
+  if (userId !== APP_USER_ID) {
+    return NextResponse.json({ ok: true, skipped: true, reason: "other_account" });
+  }
+
   const supabase = createClient(requireEnv("SUPABASE_URL"), requireEnv("SUPABASE_SERVICE_ROLE_KEY"), {
     auth: { persistSession: false },
   });

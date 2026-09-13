@@ -186,7 +186,7 @@ export function deriveRealData(
 
   const profile: ProfileStats = {
     name: "You",
-    handle: "@yoni",
+    handle: "",
     initials: "YS",
     memberSince,
     lifetimeMinutes,

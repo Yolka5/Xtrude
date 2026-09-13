@@ -23,6 +23,11 @@ export async function upsertUserFromOnshape(info: OnshapeSessionInfo): Promise<{
   const users = (rows ?? []) as BoundUser[];
   const plan = planOnshapeLogin(onshapeId, users);
   if (plan.action === "reuse") {
+    const { error: updateErr } = await sb
+      .from("users")
+      .update({ display_name: name, initials })
+      .eq("id", plan.userId);
+    if (updateErr) throw new Error(`updating user: ${updateErr.message}`);
     return { id: plan.userId, created: false };
   }
 

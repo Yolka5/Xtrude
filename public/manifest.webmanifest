@@ -3,7 +3,7 @@
   "short_name": "Xtrude",
   "description": "Modeled time, measured from what you actually built.",
   "id": "/",
-  "start_url": "/",
+  "start_url": "/connect/",
   "scope": "/",
   "display": "standalone",
   "display_override": [

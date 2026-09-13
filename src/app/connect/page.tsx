@@ -1,9 +1,8 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { FlyItem } from "@/components/FlyItem";
-import { Icon } from "@/components/Icon";
 import { getSessionUserId } from "@/lib/auth/currentUser";
-import { getHandleForUser } from "@/lib/db/handles";
+import { ensureHandleForUser } from "@/lib/db/handles";
 import { oauthStartPath, inviteCodeFromNext, safeNextPath } from "@/lib/invite";
 
 export const dynamic = "force-dynamic";
@@ -28,7 +27,7 @@ export default async function ConnectPage({
   const { error, next } = await searchParams;
   const sessionUserId = await getSessionUserId();
   if (sessionUserId && !error) {
-    const handle = await getHandleForUser(sessionUserId);
+    const handle = await ensureHandleForUser(sessionUserId);
     redirect(handle ? safeNextPath(next) ?? "/" : "/welcome/");
   }
   const message = error ? ERRORS[error] ?? "Something went wrong signing in." : null;
@@ -36,51 +35,41 @@ export default async function ConnectPage({
   const invited = Boolean(inviteCodeFromNext(next ?? null));
 
   return (
-    <main className="screen">
+    <main className="screen screen--entry">
       <FlyItem>
-        <h1 className="screen__title">Log in</h1>
-        <p className="screen__subtitle t-subhead">Or sign up — connecting Onshape creates your account.</p>
+        <p className="t-footnote dim" style={{ margin: "0 0 8px" }}>Xtrude</p>
+        <h1 className="screen__title">Log in or sign up</h1>
+        <p className="screen__subtitle t-subhead">
+          First time here starts on this screen — not someone else&apos;s profile.
+        </p>
       </FlyItem>
 
       <FlyItem>
         <section className="chunk" style={{ padding: "22px 18px" }}>
-          <div className="stack" style={{ gap: 12 }}>
+          <div className="stack" style={{ gap: 14 }}>
             <p className="t-body" style={{ margin: 0 }}>
-              Xtrude is per Onshape account. Log in with yours so you see your
-              sessions, not someone else&apos;s.
+              Use your own Onshape account. That creates your Xtrude user, your
+              name, and your @. It never opens as an existing member.
             </p>
-            <ul className="t-footnote dim" style={{ margin: 0, paddingLeft: 18, display: "grid", gap: 6 }}>
-              <li>New here? Continue with Onshape to create an Xtrude account.</li>
-              <li>Already connected? Same button logs you back in.</li>
-              <li>After that you pick your @ handle.</li>
-              {invited ? <li>Then you land in the league you were invited to.</li> : null}
-            </ul>
+            {invited ? (
+              <p className="t-footnote dim" style={{ margin: 0 }}>
+                After you connect, you join the league you were invited to.
+              </p>
+            ) : null}
             {message ? (
               <p className="t-footnote" style={{ margin: 0, color: "var(--neg, #b42318)" }}>
                 {message}
               </p>
             ) : null}
-            <Link
-              href={startHref}
-              className="text-btn text-btn--strong"
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 8,
-                minHeight: 48,
-                padding: "0 18px",
-                borderRadius: "var(--r-chip)",
-                background: "var(--label)",
-                color: "var(--surface)",
-                width: "fit-content",
-              }}
-            >
-              <Icon name="doc" size={18} />
-              Continue with Onshape
+            <Link href={startHref} className="btn btn-prism btn-block">
+              Sign up with Onshape
+            </Link>
+            <Link href={startHref} className="btn btn-secondary btn-block">
+              Log in with Onshape
             </Link>
             <p className="t-caption dimmer" style={{ margin: 0 }}>
-              We request read access to your profile and documents. Tokens stay on
-              the server.
+              Same Onshape button either way. New accounts are created on first
+              connect. We request read access to your profile and documents.
             </p>
           </div>
         </section>

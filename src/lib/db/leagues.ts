@@ -1,6 +1,7 @@
 import "server-only";
 import { getSupabase } from "./client";
-import type { League } from "@/lib/fixtures";
+import type { League, LeagueMember } from "@/lib/fixtures";
+import { getHandlesForUsers } from "./handles";
 import {
   generateJoinCode,
   minutesInDateRange,
@@ -70,6 +71,14 @@ function standingsFromRows(
   return rankStandings(inputs, meId);
 }
 
+async function attachHandles(members: LeagueMember[]): Promise<LeagueMember[]> {
+  const handles = await getHandlesForUsers(members.map((m) => m.id));
+  return members.map((m) => {
+    const handle = handles.get(m.id);
+    return handle ? { ...m, handle } : m;
+  });
+}
+
 async function soloFromUser(userId: string): Promise<LeagueView> {
   const { today, weekStart, lastWeekStart, lastWeekEnd, daysElapsed } = weekWindow(Date.now());
   const [{ data: user }, sessionRows] = await Promise.all([
@@ -81,14 +90,16 @@ async function soloFromUser(userId: string): Promise<LeagueView> {
     display_name: (user?.display_name as string | undefined) ?? "You",
     initials: (user?.initials as string | undefined) ?? "YO",
   };
-  const members = standingsFromRows(
-    [person],
-    sessionRows,
-    userId,
-    weekStart,
-    today,
-    lastWeekStart,
-    lastWeekEnd
+  const members = await attachHandles(
+    standingsFromRows(
+      [person],
+      sessionRows,
+      userId,
+      weekStart,
+      today,
+      lastWeekStart,
+      lastWeekEnd
+    )
   );
   return {
     id: null,
@@ -157,14 +168,16 @@ export async function getLeagueView(userId: string, leagueId?: string | null): P
   }
 
   const sessionRows = await sessionsForUsers(people.map((p) => p.id));
-  const members = standingsFromRows(
-    people,
-    sessionRows,
-    userId,
-    weekStart,
-    today,
-    lastWeekStart,
-    lastWeekEnd
+  const members = await attachHandles(
+    standingsFromRows(
+      people,
+      sessionRows,
+      userId,
+      weekStart,
+      today,
+      lastWeekStart,
+      lastWeekEnd
+    )
   );
 
   return {

@@ -24,13 +24,13 @@ export function LeagueContent({
   children?: React.ReactNode;
 }) {
   const reduced = useReducedMotion();
-  const me = league.members.find((m) => m.isMe) ?? league.members[0];
+  const me = league.members.find((m) => m.isMe) ?? null;
   const leader = league.members[0];
   const gap = leader && me ? leader.scoredMinutes - me.scoredMinutes : 0;
   const others = league.members.filter((m) => !m.isMe);
 
   const fillPct =
-    !leader || leader.scoredMinutes <= 0
+    !me || !leader || leader.scoredMinutes <= 0
       ? 100
       : (me.scoredMinutes / leader.scoredMinutes) * 100;
 
@@ -49,7 +49,7 @@ export function LeagueContent({
     "--hero-3": "var(--gold-3)",
   } as React.CSSProperties;
 
-  if (!me || !leader) {
+  if (!leader) {
     return (
       <main className="screen">
         <FlyItem>
@@ -76,7 +76,7 @@ export function LeagueContent({
         ) : null}
       </FlyItem>
 
-      <FlyItem>
+      {me ? <FlyItem>
         <TiltHero className="hero" style={heroStyle} edge="var(--gold-edge)">
           {/* Light raking across the gold as the card arrives - the one thing a
               podium-gold surface should do that a flat colour can't. Fires when
@@ -163,7 +163,7 @@ export function LeagueContent({
             <span className="t-footnote hero-sub">{plural(me.sessions, "session")} logged</span>
           </div>
         </TiltHero>
-      </FlyItem>
+      </FlyItem> : null}
 
       <FlyItem>
         <div className="section-head">
@@ -219,7 +219,10 @@ export function LeagueContent({
                       {m.name}
                       {m.isMe ? <span className="sr-only"> (you)</span> : null}
                     </span>
-                    <span className="rowitem__meta">{plural(m.sessions, "session")} this week</span>
+                    <span className="rowitem__meta">
+                      {m.handle ? `@${m.handle} · ` : null}
+                      {plural(m.sessions, "session")} this week
+                    </span>
                   </span>
                   <span className="stack" style={{ gap: 2, alignItems: "flex-end" }}>
                     <span className="rowitem__value">

@@ -27,10 +27,7 @@ const CACHE = \`xtrude-\${VERSION}\`;
 
 /** Routes worth having before the first offline open. */
 const SHELL = [
-  "/",
-  "/sessions/",
-  "/league/",
-  "/profile/",
+  "/connect/",
   "/manifest.webmanifest",
   "/icons/icon-192.png",
   "/icons/icon-512.png",
@@ -85,7 +82,7 @@ async function networkFirst(request) {
     const cached = await caches.match(request);
     if (cached) return cached;
     // Offline and this exact page was never cached - the shell still opens.
-    const shell = await caches.match("/");
+    const shell = await caches.match("/connect/");
     if (shell) return shell;
     return new Response("Offline", { status: 503, headers: { "Content-Type": "text/plain" } });
   }
